@@ -134,6 +134,27 @@ const RATIO_EXPLAIN = {
   inventoryVsSales: 'Depodaki stok, satışlardan daha hızlı büyüyorsa, mal elde kalıyor olabilir — ya talep zayıflıyor ya da üretim/alım fazla yapılıyor.',
 };
 
+// ── PAYLAŞILAN UI YARDIMCILARI (S: kart, RR: oran satırı) — hem sanayi "Temel Analiz"
+// sekmesi hem BankRaporuGorunumu (banka formatı) tarafından kullanılıyor; dosya seviyesinde
+// tanımlı olmalarının tek sebebi bu paylaşım, davranışları değişmedi. ──
+const S = (props) => h('div', {style: {
+  background:'rgba(20,18,16,0.6)', border:'1px solid rgba(212,165,116,0.15)',
+  borderRadius:'2px', padding:'8px 14px', marginBottom:'5px',
+}}, props.title && h('div', {style:{fontFamily:"'Fraunces',serif",fontSize:'17px',fontWeight:500,color:props.accent||'#d4a574',marginBottom:'7px',paddingBottom:'5px',borderBottom:'1px solid rgba(212,165,116,0.12)'}}, props.title), props.children);
+
+const RR = ({label, value, status, comment, ratioId}) => {
+  const s = statusColor[status] || statusColor.na;
+  const explain = comment || (ratioId ? RATIO_EXPLAIN[ratioId] : null);
+  return h('div', {style:{display:'grid',gridTemplateColumns:'1fr auto auto',gap:'8px',alignItems:'center',padding:'3px 6px',borderBottom:'1px solid rgba(212,165,116,0.08)'}},
+    h('div', null,
+      h('div', {style:{fontFamily:"'DM Sans',sans-serif",fontSize:'15px',color:'#e7e5e4',fontWeight:500}}, label),
+      explain && h('div', {style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a8a29e',marginTop:'1px',fontStyle:'italic',lineHeight:'1.25',maxWidth:'320px'}}, explain)
+    ),
+    h('div', {style:{fontFamily:"'JetBrains Mono',monospace",fontSize:'16px',color:'#f5f5f4',textAlign:'right',minWidth:'85px',fontWeight:500}}, value),
+    h('div', {style:{background:s.bg,border:'1px solid '+s.border,color:s.text,fontFamily:"'DM Sans',sans-serif",fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.05em',padding:'2px 6px',borderRadius:'2px',minWidth:'68px',textAlign:'center',fontWeight:600}}, s.label)
+  );
+};
+
 // ── BIST KALİBRASYONLU TEMEL EŞİKLER ──
 const BASE_TH = {
   grossMargin:      { excellent:0.40, good:0.25, weak:0.15, dangerous:0 },
@@ -394,6 +415,10 @@ const initialData = {
   // annualStore: { "2025": {revenue, netIncome, ...tüm ham kalemler}, "2024": {...}, ... }
   annualStore:{},
   dataMode:'quarterly', // 'quarterly' | 'annual' — Mali hangi modda görüntülediğini buton ile seçer
+  // Banka/finansal kuruluş Fintables dosyası tespit edildiğinde dolar: {ratios, verdictResult, donem}.
+  // Sanayi quarterlyStore/annualStore'undan TAMAMEN AYRI bir veri şekli (pozisyonel TTM, tarih
+  // eşlemesi yok) — bu yüzden ayrı bir alan, sanayi kayıtlarıyla hiç karışmıyor.
+  bankData: null,
 };
 
 // Çeyreklik depodan alınan kalem listesi (Excel import + manuel giriş için ortak alan adları)
@@ -984,6 +1009,11 @@ const ftParsePeriodCell = (v) => {
 };
 
 // Gelir Tablosu / Nakit Akış kalem eşleştirmesi — düz liste, bölüm ayrımı yok.
+// 19.09.2026: MAB Panel'in C# motoruyla (MAB.Engine/Fundamental/FintablesFieldMaps.cs)
+// birebir aynı kabiliyete getirildi — oradaki ek etiket varyantları (banka/sigorta/
+// faktoring format TESPİTİ için kullanılan etiketler dahil, gerçek dosyalarla yıllarca
+// kalibre edilmiş) buraya da taşındı. İki motor artık aynı Fintables dosyasını aynı
+// şekilde okuyor.
 const FT_IS_MAP = {
   'satış gelirleri':                                'revenue',
   'brüt kar (zarar)':                               'grossProfit',
@@ -992,6 +1022,17 @@ const FT_IS_MAP = {
   'dönem karı (zararı)':                            'netIncomeTotal',
   '(esas faaliyet dışı) finansal giderler (-)':     'interestExpenseRaw',
   'amortisman':                                     'depreciationAddback',
+  'faiz gelirleri':                                 'revenue',
+  'faiz giderleri (-)':                             'interestExpenseRaw',
+  'kar payı geliri':                                'revenue',
+  'kar payı giderleri (-)':                         'interestExpenseRaw',
+  'net faaliyet karı (zararı)':                     'operatingProfit',
+  'grubun karı (zararı)':                           'netIncome',
+  'brüt yazılan primler (+)':                       'revenue',
+  'esas faaliyet gelirleri':                        'revenue',
+  'finansman giderleri (-)':                        'interestExpenseRaw',
+  'brüt kar (zarar))':                              'grossProfit',
+  'net faaliyet karı (zararı':                      'operatingProfit',
 };
 const FT_CF_MAP = {
   'faaliyetlerden elde edilen nakit akışları':       'operatingCashFlow',
@@ -1004,6 +1045,7 @@ const FT_BS_SECTION_MAP = {
   'dönen varlıklar': { 'nakit ve nakit benzerleri':'cash', 'ticari alacaklar':'receivables', 'stoklar':'inventory' },
   'kısa vadeli yükümlülükler': { 'finansal borçlar':'shortTermDebt' },
   'uzun vadeli yükümlülükler': { 'finansal borçlar':'longTermDebt' },
+  'cari varlıklar': { 'nakit ve nakit benzeri varlıklar':'cash', 'nakit ve nakit benzerleri':'cash' },
 };
 // Tekil (bölüme bağlı olmayan) "Toplam ..." kalemleri
 const FT_BS_GLOBAL_MAP = {
@@ -1013,7 +1055,27 @@ const FT_BS_GLOBAL_MAP = {
   'toplam uzun vadeli yükümlülükler':'ltLiabilitiesTotal', // yardımcı — totalLiabilities'e toplanır
   'toplam özkaynaklar':              'equity',
   'ödenmiş sermaye':                 'sharesOutstanding', // BIST'te nominal hisse değeri 1 TL — TL tutarı = hisse adedi
+  'nakit ve nakit benzerleri':       'cash',
+  'nakit, nakit benzerleri ve merkez bankası': 'cash',
+  'varlıklar toplamı':               'totalAssets',
+  'yükümlülükler toplamı':           'totalLiabilities',
+  'özkaynaklar':                     'equity',
+  'cari varlıklar toplamı':          'currentAssets',
+  'kısa vadeli yükümlülükler toplamı':'currentLiabilities',
+  'uzun vadeli yükümlülükler toplamı':'ltLiabilitiesTotal',
+  'özkaynak toplamı':                'equity',
 };
+// Girintisiz olmasa BİLE her zaman yeni bölüm başlığı sayılan etiketler — bazı gerçek
+// dosyalarda bu başlıklar (yanlışlıkla ya da farklı export ayarıyla) girintili gelebiliyor;
+// MAB Panel'in C# tarafında da aynı güvenlik ağı var.
+const BS_BILINEN_BOLUM_BASLIKLARI = new Set(['uzun vadeli yükümlülükler', 'cari varlıklar', 'kısa vadeli yükümlülükler']);
+
+// Format tespiti — hangi etiketler görülürse dosya "banka"/"sigorta"/"faktoring" sayılır.
+// BİLİNÇLİ: FT_IS_MAP'teki AYNI etiketler (format tespiti için de kullanılıyor) — iki ayrı
+// sözlük İCAT EDİLMEDİ, MAB Panel'deki FintablesParser.cs ile birebir aynı yaklaşım.
+const FORMAT_TESPIT_BANKA_ETIKETLERI = new Set(['faiz gelirleri', 'kar payı geliri']);
+const FORMAT_TESPIT_SIGORTA_ETIKETLERI = new Set(['brüt yazılan primler (+)']);
+const FORMAT_TESPIT_FAKTORING_ETIKETLERI = new Set(['esas faaliyet gelirleri']);
 
 // "Kalem" hücresini arayarak başlık satırı + etiket sütununu bulur (Fintables'ta sabit
 // {r:0,c:0} değil, ama Investing.com'daki kadar oynak da değil — yine de aramak güvenli).
@@ -1083,7 +1145,7 @@ const ftParseBalanceSheet = (ws) => {
     if (raw.trim() === '') continue;
     const isIndented = /^\s/.test(raw);
     const norm = raw.trim().toLowerCase();
-    if (!isIndented) { currentSection = norm; continue; }
+    if (!isIndented || BS_BILINEN_BOLUM_BASLIKLARI.has(norm)) { currentSection = norm; continue; }
     const sec = FT_BS_SECTION_MAP[currentSection];
     const field = (sec && sec[norm]) ? sec[norm] : (FT_BS_GLOBAL_MAP[norm] || null);
     if (!field) continue;
@@ -1098,9 +1160,30 @@ const ftParseBalanceSheet = (ws) => {
   return Object.values(acc);
 };
 
+// Gelir Tablosu (Çeyreklik) sayfasının etiket sütununu tarayıp dosyanın "banka"/"sigorta"/
+// "faktoring"/"genel" formatından hangisi olduğunu tespit eder. MAB Panel'deki
+// FintablesParser.TespitEtFormatTipi ile birebir aynı mantık.
+const tespitEtFormatTipi = (ws) => {
+  if (!ws || !ws['!ref']) return 'genel';
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const { headerRow, labelCol } = ftFindHeader(ws, range);
+  if (headerRow === -1) return 'genel';
+  for (let r = headerRow + 1; r <= range.e.r; r++) {
+    const cell = ws[XLSX.utils.encode_cell({r, c:labelCol})];
+    if (!cell || cell.v === undefined || cell.v === null) continue;
+    const norm = String(cell.v).trim().toLowerCase();
+    if (FORMAT_TESPIT_BANKA_ETIKETLERI.has(norm)) return 'banka';
+    if (FORMAT_TESPIT_SIGORTA_ETIKETLERI.has(norm)) return 'sigorta';
+    if (FORMAT_TESPIT_FAKTORING_ETIKETLERI.has(norm)) return 'faktoring';
+  }
+  return 'genel';
+};
+
 // Tüm Fintables workbook'unu (7 sayfa) işleyip çeyreklik + yıllık kayıt setleri üretir.
-// Dönderir: { quarterlyRecords: {"2026Q2":{...}}, annualRecords: {"2025":{...}} }
-// ya da { error: 'sheets_missing' | 'bank_format' }.
+// Dönderir: { quarterlyRecords: {"2026Q2":{...}}, annualRecords: {"2025":{...}}, formatType }
+// ya da { error: 'sheets_missing' | 'bank_format' | 'sigorta_format' | 'faktoring_format' }
+// ya da (banka tespit edildiğinde) { formatType:'banka', bankSheets:{bilanco, gelir} } — Error YOK,
+// çağıran taraf bankExtract/bankComputeRatios ile ayrı bir yoldan işler (bkz. handleFintablesUpload).
 const parseFintablesWorkbook = (wb) => {
   const shBS  = wb.Sheets['Bilanço'];
   const shISQ = wb.Sheets['Gelir Tablosu (Çeyreklik)'];
@@ -1108,6 +1191,12 @@ const parseFintablesWorkbook = (wb) => {
   const shCFQ = wb.Sheets['Nakit Akış (Çeyreklik)'];
   const shCFY = wb.Sheets['Nakit Akış (Yıllıklan.)'];
   if (!shBS || !shISQ || !shCFQ) return { error: 'sheets_missing' };
+
+  const formatType = tespitEtFormatTipi(shISQ);
+  if (formatType === 'banka') return { formatType, bankSheets: { bilanco: shBS, gelir: shISQ } };
+  if (formatType === 'sigorta' || formatType === 'faktoring') {
+    return { formatType, error: formatType === 'sigorta' ? 'sigorta_format' : 'faktoring_format' };
+  }
 
   const isQ = ftParseFlatSheet(shISQ, FT_IS_MAP);
   if (!isQ.some(r => r.values.revenue !== undefined)) return { error: 'bank_format' };
@@ -1155,7 +1244,146 @@ const parseFintablesWorkbook = (wb) => {
     annualRecords[label] = deriveRecord(r.values, cfMatch ? cfMatch.values : {}, bsByKey[r.y+'-12']);
   });
 
-  return { quarterlyRecords, annualRecords };
+  return { quarterlyRecords, annualRecords, formatType };
+};
+
+// ── BANKA / FİNANSAL KURULUŞ MOTORU ──
+// MAB Panel'deki BankFundamentalAnalysis.cs (BankFieldExtractor/BankRatioCalculator/
+// BankQualityScorer/BankReportBuilder) ile birebir aynı hesaplama — sanayi RatioCalculator/
+// QualityScorer'ın (Brüt Kâr Marjı, Stok Devir Hızı, Cari Oran gibi bankalar için ANLAMSIZ
+// oranları) hiç karışmadığı, ayrı ve kendi kendine yeten bir yol.
+// ⚠️ EŞİK NOTU (C# tarafındaki AYNI uyarı): excellent/good/weak/dangerous eşikleri Türk
+// bankacılık sektörü için genel bilgiye dayanan İLK TAHMİN değerler — resmi bir BDDK/sektör
+// kıyaslamasına karşı doğrulanmadı. KAPSAM DIŞI (bilinçli): gerçek BDDK Sermaye Yeterlilik
+// Oranı bu genel amaçlı Fintables export'unda YOK — Özkaynak/Aktif oranı bir KALDIRAÇ
+// proxy'si olarak kullanıldı, gerçek CAR değildir.
+const BANK_BS_MAP = {
+  'krediler': 'krediler',
+  'donuk alacaklar': 'donukAlacaklar',
+  'mevduat': 'mevduat',
+  'özkaynaklar': 'ozkaynaklar',
+  'varlıklar toplamı': 'varliklarToplami',
+};
+const BANK_IS_MAP = {
+  'net faiz geliri veya gideri': 'netFaizGeliri',
+  'net ücret ve komisyon gelirleri veya giderleri': 'netUcretKomisyon',
+  'faaliyet brüt kârı': 'faaliyetBrutKari',
+  'diğer faaliyet giderleri (-)': 'digerFaaliyetGiderleri',
+  'personel giderleri (-)': 'personelGiderleri',
+  'beklenen zarar karşılıkları (-)': 'beklenenZararKarsiliklari',
+  'dönem net karı veya zararı': 'donemNetKari',
+};
+
+// rows: bir çalışma sayfasının ham satır ızgarası (XLSX.utils.sheet_to_json(ws,{header:1})
+// ile üretilir) — row[0] etiket, row[1..] dönem sütunları (soldan sağa en güncelden en
+// eskiye, Fintables'ın kendi sütun sırası — tarih bazlı eşleme YAPILMAZ, C# tarafıyla aynı
+// basitleştirme).
+const bankExtract = (rows, fieldMap) => {
+  const result = {};
+  for (const row of rows) {
+    if (!row || row.length < 2) continue;
+    const labelV = row[0];
+    if (labelV === undefined || labelV === null) continue;
+    const norm = String(labelV).trim().toLowerCase();
+    const field = fieldMap[norm];
+    if (!field) continue;
+    const seri = [];
+    for (let i = 1; i < row.length; i++) {
+      const v = row[i];
+      seri.push(typeof v === 'number' ? v : null);
+    }
+    result[field] = seri;
+  }
+  return result;
+};
+// Bir akış kaleminin TTM'i (offset'ten başlayarak 4 çeyrek toplamı) — offset=0 güncel TTM, offset=4 bir yıl önceki TTM.
+const bankTtm = (seriler, field, offset) => {
+  const seri = seriler[field];
+  if (!seri || seri.length < offset + 4) return null;
+  let toplam = 0, hicVeriYok = true;
+  for (let i = offset; i < offset + 4; i++) {
+    const v = seri[i];
+    if (v !== null && v !== undefined) { toplam += v; hicVeriYok = false; }
+  }
+  return hicVeriYok ? null : toplam;
+};
+// Bir stok kaleminin en güncel (0. sütun) değeri.
+const bankGuncel = (seriler, field) => (seriler[field] && seriler[field].length > 0) ? seriler[field][0] : null;
+
+const BANK_TH = {
+  nim:              { excellent:0.06, good:0.04, weak:0.02, dangerous:0 },
+  ucretKomisyon:    { excellent:0.25, good:0.15, weak:0.08, dangerous:0 },
+  roe:              { excellent:0.25, good:0.15, weak:0.08, dangerous:0 },
+  roa:              { excellent:0.025, good:0.015, weak:0.005, dangerous:0 },
+  ozkaynakAktif:    { excellent:0.12, good:0.09, weak:0.06, dangerous:0 },
+  krediMevduat:     { excellent:0.70, good:0.90, weak:1.10, dangerous:999, inverse:true },
+  npl:              { excellent:0.02, good:0.04, weak:0.07, dangerous:999, inverse:true },
+  giderGelir:       { excellent:0.35, good:0.45, weak:0.60, dangerous:999, inverse:true },
+  netKarBuyume:     { excellent:0.30, good:0.10, weak:-0.10, dangerous:-999 },
+  faizGeliriBuyume: { excellent:0.25, good:0.10, weak:-0.05, dangerous:-999 },
+  karsilik:         { excellent:0.10, good:0.20, weak:0.35, dangerous:999, inverse:true },
+};
+
+const bankComputeRatios = (bilanco, gelir) => {
+  const bil = (f) => bankGuncel(bilanco, f);
+  const ttmNow = (f) => bankTtm(gelir, f, 0);
+  const ttmYilOnce = (f) => bankTtm(gelir, f, 4);
+
+  const krediler = bil('krediler'), donukAlacaklar = bil('donukAlacaklar'), mevduat = bil('mevduat'),
+        ozkaynaklar = bil('ozkaynaklar'), varliklar = bil('varliklarToplami');
+  const netFaizGeliri = ttmNow('netFaizGeliri'), netUcretKomisyon = ttmNow('netUcretKomisyon'),
+        faaliyetBrutKari = ttmNow('faaliyetBrutKari'), digerFaaliyetGiderleri = ttmNow('digerFaaliyetGiderleri'),
+        personelGiderleri = ttmNow('personelGiderleri'), beklenenZararKarsiliklari = ttmNow('beklenenZararKarsiliklari'),
+        donemNetKari = ttmNow('donemNetKari');
+  const netFaizGeliriYilOnce = ttmYilOnce('netFaizGeliri'), donemNetKariYilOnce = ttmYilOnce('donemNetKari');
+
+  const oran = (pay, payda) => (pay !== null && payda !== null && payda !== 0) ? pay / payda : null;
+  const buyume = (simdi, once) => (simdi !== null && once !== null && once !== 0) ? (simdi - once) / Math.abs(once) : null;
+
+  return {
+    nim: oran(netFaizGeliri, varliklar),
+    ucretKomisyon: oran(netUcretKomisyon, faaliyetBrutKari),
+    roe: oran(donemNetKari, ozkaynaklar),
+    roa: oran(donemNetKari, varliklar),
+    ozkaynakAktif: oran(ozkaynaklar, varliklar),
+    krediMevduat: oran(krediler, mevduat),
+    npl: (krediler !== null && donukAlacaklar !== null && (krediler + donukAlacaklar) !== 0)
+      ? donukAlacaklar / (krediler + donukAlacaklar) : null,
+    giderGelir: ((digerFaaliyetGiderleri !== null || personelGiderleri !== null) && faaliyetBrutKari !== null && faaliyetBrutKari !== 0)
+      ? (Math.abs(digerFaaliyetGiderleri||0) + Math.abs(personelGiderleri||0)) / faaliyetBrutKari : null,
+    netKarBuyume: buyume(donemNetKari, donemNetKariYilOnce),
+    faizGeliriBuyume: buyume(netFaizGeliri, netFaizGeliriYilOnce),
+    karsilik: (beklenenZararKarsiliklari !== null && faaliyetBrutKari !== null && faaliyetBrutKari !== 0)
+      ? Math.abs(beklenenZararKarsiliklari) / faaliyetBrutKari : null,
+  };
+};
+
+const BANK_V_CORE  = {text:'CORE', color:'#4ade80', bg:'rgba(74,222,128,0.12)', detail:'Banka metriklerinin çoğu sağlıklı aralıkta — core kalitesi var.'};
+const BANK_V_IZLE  = {text:'İZLE', color:'#fbbf24', bg:'rgba(251,191,36,0.12)', detail:'Karma tablo: bazı banka metrikleri eşiği karşılamıyor. Net bir hüküm çıkmıyor.'};
+const BANK_V_BEKLE = {text:'BİLANÇO-BEKLE', color:'#f87171', bg:'rgba(248,113,113,0.12)', detail:'Banka metriklerinin çoğu eşiği karşılamıyor — bilanço şu an fundamental destek sağlamıyor.'};
+
+const bankComputeVerdict = (r) => {
+  const rows = [
+    ['nim', r.nim], ['ucretKomisyon', r.ucretKomisyon], ['roe', r.roe], ['roa', r.roa],
+    ['ozkaynakAktif', r.ozkaynakAktif], ['krediMevduat', r.krediMevduat], ['npl', r.npl],
+    ['giderGelir', r.giderGelir], ['netKarBuyume', r.netKarBuyume],
+    ['faizGeliriBuyume', r.faizGeliriBuyume], ['karsilik', r.karsilik],
+  ];
+  let excellent=0, good=0, weak=0, dangerous=0;
+  for (const [id, val] of rows) {
+    const s = evalRatio(val, BANK_TH[id]);
+    if (s==='excellent') excellent++; else if (s==='good') good++; else if (s==='weak') weak++; else if (s==='dangerous') dangerous++;
+  }
+  const totalEvaluated = excellent+good+weak+dangerous;
+  const negativeCount = weak+dangerous;
+  const negativeRatio = totalEvaluated>0 ? negativeCount/totalEvaluated : 0;
+  let verdict = null, knockoutReason = null;
+  if (totalEvaluated >= 8) {
+    if (r.roe !== null && r.roe < 0) knockoutReason = 'Banka zarar ediyor (ROE negatif)';
+    else if (r.npl !== null && r.npl > 0.15) knockoutReason = 'Takipteki kredi oranı çok yüksek (>%15)';
+    verdict = knockoutReason ? BANK_V_BEKLE : (negativeRatio > 0.55 ? BANK_V_BEKLE : negativeRatio >= 0.35 ? BANK_V_IZLE : BANK_V_CORE);
+  }
+  return { verdict, knockoutReason, statusCounts:{excellent,good,weak,dangerous,na:11-totalEvaluated}, totalEvaluated, negativeCount, negativeRatio };
 };
 
 // ── v17: EĞİTİM KONSOLU — Sözlük + DuPont + Rehberli Tur + Quiz + Vaka/Karşılaştırma ──
@@ -1822,6 +2050,67 @@ function EgitimModu({ data, r }){
   );
 }
 
+// ── Banka / Finansal Kuruluş Raporu — sanayi "Temel Analiz" görünümünün YERİNE geçer
+// (data.bankData doluysa). MAB Panel'deki BankReportBuilder.cs'in üç bölümüyle (Bankacılık
+// Kârlılığı / Sermaye & Risk / Verimlilik & Büyüme) birebir aynı etiket, açıklama ve sıra. ──
+function BankRaporuGorunumu({ data, uploadMsg }){
+  const bd = data.bankData;
+  if (!bd) return null;
+  const r = bd.ratios, vr = bd.verdictResult, verdict = vr.verdict;
+
+  const bankRow = (label, ratioId, explanation) => h(RR, {
+    key: ratioId, label, value: fmt(r[ratioId], {pct:true, decimals:2}),
+    status: evalRatio(r[ratioId], BANK_TH[ratioId]), comment: explanation,
+  });
+
+  return h('div', null,
+    uploadMsg && h('div', {style:{background:'rgba(20,18,16,0.8)',border:'1px solid rgba(212,165,116,0.3)',padding:'6px 14px',marginBottom:'7px',fontSize:'14px',color:'#d6d3d1',borderRadius:'2px'}}, uploadMsg),
+    h('div', {style:{background:'rgba(20,18,16,0.6)',border:'1px solid rgba(212,165,116,0.15)',borderRadius:'2px',padding:'6px 14px',marginBottom:'7px',display:'flex',gap:'18px',flexWrap:'wrap',alignItems:'center'}},
+      h('div', null, h('span',{style:{fontSize:'12px',color:'#78716c',textTransform:'uppercase',letterSpacing:'0.05em'}},'Kod: '), h('span',{style:{fontFamily:"'JetBrains Mono',monospace",color:'#d4a574',fontWeight:600,fontSize:'14px'}}, data.ticker)),
+      h('div', null, h('span',{style:{fontSize:'12px',color:'#78716c',textTransform:'uppercase',letterSpacing:'0.05em'}},'Sektör: '), h('span',{style:{fontSize:'14px',color:'#e7e5e4'}}, 'Banka / Finansal Kuruluş')),
+      h('div', null, h('span',{style:{fontSize:'12px',color:'#78716c',textTransform:'uppercase',letterSpacing:'0.05em'}},'Dönem: '), h('span',{style:{fontFamily:"'JetBrains Mono',monospace",fontSize:'14px',color:'#e7e5e4'}}, bd.donem))
+    ),
+
+    !verdict
+      ? h('div', {style:{background:'rgba(20,18,16,0.7)',border:'1px solid rgba(212,165,116,0.25)',borderRadius:'2px',padding:'12px 18px',marginBottom:'7px',color:'#a8a29e',fontSize:'14px'}},
+          'Yeterli banka metriği değerlendirilemediği için (toplam ' + vr.totalEvaluated + ' metrik) net bir hüküm verilemedi — dosyada Bilanço/Gelir Tablosu (Çeyreklik) en az 8 çeyreklik veri içermeli.')
+      : h('div', {style:{
+          background:verdict.bg, border:'1px solid '+verdict.color+'66', borderLeft:'5px solid '+verdict.color,
+          padding:'10px 18px', marginBottom:'7px', borderRadius:'2px',
+          display:'flex', alignItems:'center', gap:'18px', flexWrap:'wrap'
+        }},
+          h('div', {style:{fontFamily:"'Fraunces',serif",fontSize:'22px',fontWeight:600,color:verdict.color}}, verdict.text),
+          h('div', {style:{fontFamily:"'DM Sans',sans-serif",fontSize:'15px',color:'#e7e5e4',flex:1,minWidth:'200px'}},
+            vr.knockoutReason ? ('Doğrudan etkili neden: ' + vr.knockoutReason + '.') : verdict.detail),
+          h('div', {style:{fontFamily:"'JetBrains Mono',monospace",fontSize:'14px',color:'#a8a29e'}}, vr.negativeCount + '/' + vr.totalEvaluated + ' olumsuz · %' + (vr.negativeRatio*100).toFixed(0))
+        ),
+
+    h('div', {style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:'10px'}},
+      h(S, {title:'Bankacılık Kârlılığı', accent:'#a3e635'},
+        bankRow('Net Faiz Marjı (NIM, yaklaşık)', 'nim', 'Net faiz gelirinin toplam varlıklara oranı — bankanın çekirdek faiz işinden ne kadar kazandığının kaba göstergesi. Gerçek NIM ortalama getirili varlık kullanır, burada toplam aktif kullanıldı (basitleştirme).'),
+        bankRow('Ücret & Komisyon Geliri Payı', 'ucretKomisyon', 'Faiz dışı gelirin (kart, işlem, danışmanlık ücretleri) faaliyet kârı içindeki payı. Yüksekse gelir faiz oranlarına daha az bağımlı, daha istikrarlı.'),
+        bankRow('ROE (Özkaynak Kârlılığı)', 'roe', 'Ortakların koyduğu her 100 TL özkaynağın yılda kaç TL kâra dönüştüğü.'),
+        bankRow('ROA (Aktif Kârlılığı)', 'roa', 'Bankanın TÜM varlıklarının (mevduat+özkaynak kaynaklı) ne kadar kâr ürettiği.')
+      ),
+      h(S, {title:'Sermaye & Risk (BDDK Sermaye Yeterliliği DEĞİL — yaklaşık gösterge)', accent:'#fbbf24'},
+        bankRow('Özkaynak / Aktif Oranı', 'ozkaynakAktif', 'Kaldıraç/sermaye tamponu yaklaşık göstergesi — gerçek BDDK Sermaye Yeterlilik Oranı (risk ağırlıklı varlıklara göre) bu tablodan hesaplanamıyor, sadece bankanın ayrı BDDK/yatırımcı sunumunda var.'),
+        bankRow('Kredi / Mevduat Oranı', 'krediMevduat', 'Verilen kredilerin toplanan mevduata oranı. Çok yüksekse banka fonlamayı mevduat dışı kaynaklara daha bağımlı hale getirmiş olabilir (kırılganlık); çok düşükse kaynak verimsiz kullanılıyor olabilir.'),
+        bankRow('Takipteki Kredi Oranı (NPL)', 'npl', 'Donuk (tahsili gecikmiş/şüpheli) kredilerin toplam kredi+donuk içindeki payı. Yüksekse kredi portföyünün kalitesi bozuluyor demektir.'),
+        bankRow('Karşılık / Faaliyet Kârı Oranı', 'karsilik', 'Beklenen zarar karşılıklarının faaliyet brüt kârını ne kadar yediği — risk maliyetinin kârlılığa etkisi.')
+      ),
+      h(S, {title:'Verimlilik & Büyüme', accent:'#c4b5fd'},
+        bankRow('Gider / Gelir Oranı (Cost-to-Income)', 'giderGelir', 'Personel + diğer faaliyet giderlerinin faaliyet brüt kârına oranı. Düşükse banka giderlerini iyi yönetiyor demektir.'),
+        bankRow('Net Kâr Büyümesi (YoY)', 'netKarBuyume', 'Son 12 aylık net kârın bir önceki 12 aya göre büyümesi.'),
+        bankRow('Net Faiz Geliri Büyümesi (YoY)', 'faizGeliriBuyume', 'Bankanın çekirdek faiz işinin büyüme hızı.')
+      )
+    ),
+
+    h('div', {style:{fontSize:'13px',color:'#78716c',fontStyle:'italic',padding:'10px 4px',lineHeight:'1.5'}},
+      '⚠ Banka/finansal kuruluş analizi — eşikler ilk tahmindir (Türk bankacılık sektörü için genel bilgiye dayalı, resmi BDDK/sektör kıyaslamasına karşı doğrulanmadı), resmi BDDK sermaye yeterlilik oranını içermez. Sanayi şirketleri için kullanılan Brüt Kâr Marjı, Stok Devir Hızı, Cari Oran gibi oranlar bankalar için anlamsız olduğundan hiç kullanılmadı — bunun yerine bankaya özel 11 metrik değerlendirildi.'
+    )
+  );
+}
+
 function FundamentalAnalysis() {
   const [data, setData] = useState(initialData);
   const [uploadMsg, setUploadMsg] = useState('');
@@ -1952,21 +2241,64 @@ function FundamentalAnalysis() {
         event.target.value=''; return;
       }
       if (result.error === 'bank_format') {
-        setUploadMsg('⚠️ ' + chosen + ': banka formatı tespit edildi — Fintables entegrasyonu şu an sadece banka-dışı şirketleri destekliyor.');
+        setUploadMsg('⚠️ ' + chosen + ': bu dosyada hasılat/gelir alanı tanınamadı — Fintables formatında export edilmiş bir sanayi/holding şirketi dosyası mı?');
         event.target.value=''; return;
+      }
+      if (result.error === 'sigorta_format') {
+        setUploadMsg('⚠️ ' + chosen + ': bu dosya sigorta şirketi formatında ("Brüt Yazılan Primler" tespit edildi) — bu içe aktarma şu an sigorta şirketlerini desteklemiyor (banka desteği var; sigorta için henüz özel bir analiz motoru yok).');
+        event.target.value=''; return;
+      }
+      if (result.error === 'faktoring_format') {
+        setUploadMsg('⚠️ ' + chosen + ': bu dosya faktoring şirketi formatında ("Esas Faaliyet Gelirleri" tespit edildi) — bu içe aktarma şu an faktoring şirketlerini desteklemiyor (banka desteği var; faktoring için henüz özel bir analiz motoru yok).');
+        event.target.value=''; return;
+      }
+
+      // Banka/finansal kuruluş — sanayi RatioCalculator/QualityScorer'a hiç uğramadan
+      // ayrı bir yoldan (bankExtract → bankComputeRatios → bankComputeVerdict) geçer.
+      if (result.formatType === 'banka') {
+        const bilancoRows = XLSX.utils.sheet_to_json(result.bankSheets.bilanco, {header:1, raw:true, defval:null});
+        const gelirRows = XLSX.utils.sheet_to_json(result.bankSheets.gelir, {header:1, raw:true, defval:null});
+        const bilancoSeriler = bankExtract(bilancoRows, BANK_BS_MAP);
+        const gelirSeriler = bankExtract(gelirRows, BANK_IS_MAP);
+        const ratios = bankComputeRatios(bilancoSeriler, gelirSeriler);
+        const verdictResult = bankComputeVerdict(ratios);
+
+        let sonDonem = '?';
+        const headerRowIdx = gelirRows.findIndex(row => row && row[0] !== null && row[0] !== undefined && String(row[0]).trim().toLowerCase() === 'kalem');
+        if (headerRowIdx !== -1 && gelirRows[headerRowIdx].length > 1) {
+          const periyot = ftParsePeriodCell(gelirRows[headerRowIdx][1]);
+          if (periyot && QUARTER_FROM_MONTH[periyot.m]) sonDonem = periyot.y + 'Q' + QUARTER_FROM_MONTH[periyot.m];
+        }
+
+        let blockedByBank = null;
+        setData(d => {
+          const hasExisting = d.ticker && (Object.keys(d.quarterlyStore || {}).length > 0 || d.bankData);
+          if (hasExisting && d.ticker !== chosen) { blockedByBank = d.ticker; return d; }
+          return {...d, ticker: d.ticker || chosen, sector: 'banka', dataMode:'quarterly',
+            bankData: { ratios, verdictResult, donem: sonDonem }};
+        });
+
+        if (blockedByBank) {
+          setUploadMsg('⚠️ Şu an ' + blockedByBank + ' yüklü — farklı şirket (' + chosen + ') yüklemek için önce "Sıfırla" ya bas.');
+        } else {
+          setUploadMsg('✅ Fintables yüklendi: ' + chosen + ' — banka/finansal kuruluş formatı tespit edildi, sektör "Banka / Finansal Kuruluş" olarak sabitlendi.'
+            + (extraSkipped.length ? ' Aynı yüklemede bulunan diğer şirketler atlandı (tek seferde tek şirket): ' + extraSkipped.join(', ') + '.' : ''));
+        }
+        event.target.value = '';
+        return;
       }
 
       let blockedBy = null;
       let autoSector = null;
       setData(d => {
-        const hasExisting = d.ticker && Object.keys(d.quarterlyStore || {}).length > 0;
+        const hasExisting = d.ticker && (Object.keys(d.quarterlyStore || {}).length > 0 || d.bankData);
         if (hasExisting && d.ticker !== chosen) { blockedBy = d.ticker; return d; }
         const quarterlyStore = {...d.quarterlyStore};
         const annualStore = {...d.annualStore};
         Object.entries(result.quarterlyRecords).forEach(([label, rec]) => { quarterlyStore[label] = {...(quarterlyStore[label]||{}), ...rec}; });
         Object.entries(result.annualRecords).forEach(([label, rec]) => { annualStore[label] = {...(annualStore[label]||{}), ...rec}; });
         if (!d.sector && TICKER_SECTOR_MAP[chosen]) autoSector = TICKER_SECTOR_MAP[chosen];
-        const merged = {...d, quarterlyStore, annualStore, ticker: d.ticker || chosen,
+        const merged = {...d, quarterlyStore, annualStore, ticker: d.ticker || chosen, bankData: null,
           sector: d.sector || TICKER_SECTOR_MAP[chosen] || d.sector, dataMode:'quarterly'};
         const periods = Object.keys(quarterlyStore).sort((a,b) => periodSortKey(b)-periodSortKey(a));
         return applyPeriodToData(merged, periods[0] || d.activePeriod, 'quarterly');
@@ -2409,24 +2741,7 @@ function FundamentalAnalysis() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
-  // ── UI YARDIMCILARI ──
-  const S = (props) => h('div', {style: {
-    background:'rgba(20,18,16,0.6)', border:'1px solid rgba(212,165,116,0.15)',
-    borderRadius:'2px', padding:'8px 14px', marginBottom:'5px',
-  }}, props.title && h('div', {style:{fontFamily:"'Fraunces',serif",fontSize:'17px',fontWeight:500,color:props.accent||'#d4a574',marginBottom:'7px',paddingBottom:'5px',borderBottom:'1px solid rgba(212,165,116,0.12)'}}, props.title), props.children);
-
-  const RR = ({label, value, status, comment, ratioId}) => {
-    const s = statusColor[status] || statusColor.na;
-    const explain = comment || (ratioId ? RATIO_EXPLAIN[ratioId] : null);
-    return h('div', {style:{display:'grid',gridTemplateColumns:'1fr auto auto',gap:'8px',alignItems:'center',padding:'3px 6px',borderBottom:'1px solid rgba(212,165,116,0.08)'}},
-      h('div', null,
-        h('div', {style:{fontFamily:"'DM Sans',sans-serif",fontSize:'15px',color:'#e7e5e4',fontWeight:500}}, label),
-        explain && h('div', {style:{fontFamily:"'DM Sans',sans-serif",fontSize:'12px',color:'#a8a29e',marginTop:'1px',fontStyle:'italic',lineHeight:'1.25',maxWidth:'320px'}}, explain)
-      ),
-      h('div', {style:{fontFamily:"'JetBrains Mono',monospace",fontSize:'16px',color:'#f5f5f4',textAlign:'right',minWidth:'85px',fontWeight:500}}, value),
-      h('div', {style:{background:s.bg,border:'1px solid '+s.border,color:s.text,fontFamily:"'DM Sans',sans-serif",fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.05em',padding:'2px 6px',borderRadius:'2px',minWidth:'68px',textAlign:'center',fontWeight:600}}, s.label)
-    );
-  };
+  // ── UI YARDIMCILARI ── (S/RR artık dosya seviyesinde tanımlı, BankRaporuGorunumu ile paylaşılıyor)
 
   // v17: sayı kutularına yapıştırılan Türkçe biçimli rakamları (binlik nokta, ondalık virgül) temizler.
   // Ayrıca type="number" yerine type="text" kullanmamızın sebebi de bu — tarayıcının "number" input'u
@@ -2510,7 +2825,9 @@ function FundamentalAnalysis() {
     ),
 
     // ───── TEMEL ANALİZ PANELİ ─────
-    activeTab === 'analiz' && h('div', null,
+    // Banka/finansal kuruluş formatı tespit edildiyse (data.bankData), sanayi görünümü hiç
+    // render edilmez — ayrı BankRaporuGorunumu devreye girer (bkz. handleFintablesUpload).
+    activeTab === 'analiz' && (data.bankData ? h(BankRaporuGorunumu, {data, uploadMsg}) : h('div', null,
     // ÖZET KUTUSU: İlk 30 Saniye
     (() => {
       if (totalEvaluated < 5) return null;
@@ -2826,7 +3143,7 @@ function FundamentalAnalysis() {
           );
         })()
       )
-    ) ) // activeTab === 'analiz' sarmalayıcı div kapanışı
+    ) )) // activeTab === 'analiz' sarmalayıcı div kapanışı (data.bankData ? ... : ...) dahil
     ,
 
     // ───── SADE TABLO PANELİ — motorun okuduğu kanonik kalemler, tekrarsız/kalabalıksız ─────
