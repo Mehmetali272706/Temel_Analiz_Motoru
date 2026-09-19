@@ -2084,7 +2084,7 @@ function FundamentalAnalysis() {
   const negativeRatio = totalEvaluated > 0 ? negativeCount / totalEvaluated : 0;
 
   // Verdict
-  const V_CORE  = {text:'CORE',  color:'#4ade80', bg:'rgba(74,222,128,0.12)', detail:'Çoğu metrik eşiği karşılıyor — core kalitesi var. MAB-5 sinyaliyle zamanlama belirle.'};
+  const V_CORE  = {text:'CORE',  color:'#4ade80', bg:'rgba(74,222,128,0.12)', detail:'Çoğu metrik eşiği karşılıyor — core kalitesi var. Teknik sinyalle zamanlama belirle.'};
   const V_IZLE  = {text:'İZLE',  color:'#fbbf24', bg:'rgba(251,191,36,0.12)',  detail:'Karma tablo: bazı kalemler eşiği karşılamıyor. Trade olarak değerlendirilebilir.'};
   const V_BEKLE = {text:'BİLANÇO-BEKLE', color:'#f87171', bg:'rgba(248,113,113,0.12)', detail:'Metriklerin çoğu eşiği karşılamıyor — fundamental destek yok. Bir sonraki bilançoda yeniden bak.'};
 
@@ -2307,14 +2307,14 @@ function FundamentalAnalysis() {
     // OLASI SONUÇ: verdict tipine göre kural bazlı projeksiyon
     let sonuc;
     if (verdict.text === 'BİLANÇO-BEKLE') {
-      sonuc = 'Mevcut veriyle pozisyon açmak fundamental açıdan savunulabilir değil. MAB-5 teknik sinyali AL verse bile, bu sinyal yalnızca küçük/sıkı stoplu bir trade olarak ele alınmalı — core pozisyon için bir sonraki bilanço döneminde tabloyu yeniden değerlendirmek gerekir. Knockout nedeni ortadan kalkmadan (örn. kazanç kalitesi düzelmeden, FAVÖK pozitife dönmeden) hüküm değişmez.';
+      sonuc = 'Mevcut veriyle pozisyon açmak fundamental açıdan savunulabilir değil. Teknik sinyal AL verse bile, bu sinyal yalnızca küçük/sıkı stoplu bir trade olarak ele alınmalı — core pozisyon için bir sonraki bilanço döneminde tabloyu yeniden değerlendirmek gerekir. Knockout nedeni ortadan kalkmadan (örn. kazanç kalitesi düzelmeden, FAVÖK pozitife dönmeden) hüküm değişmez.';
     } else if (verdict.text === 'İZLE') {
       sonuc = 'Şirket ne net bir core adayı ne de net bir red. Karma tablo, pozisyonun trade mantığıyla ve daha küçük büyüklükte ele alınmasını gerektirir. Zayıf kalan metriklerin bir sonraki dönemde iyileşip iyileşmediği, hükmü CORE veya BİLANÇO-BEKLE yönüne kaydırabilir.';
     } else if (verdict.text === 'CORE') {
       if (valuationDanger >= 3) {
-        sonuc = 'Bilanço kalitesi core seviyesinde, ancak fiyat/değerleme tarafı pahalı bölgede. Bu kombinasyon "kaliteli şirket, kötü zamanlanmış giriş" riski taşır — pozisyon büyüklüğü ve giriş zamanlaması MAB-5 sinyaliyle daha sıkı eşleştirilmeli.';
+        sonuc = 'Bilanço kalitesi core seviyesinde, ancak fiyat/değerleme tarafı pahalı bölgede. Bu kombinasyon "kaliteli şirket, kötü zamanlanmış giriş" riski taşır — pozisyon büyüklüğü ve giriş zamanlaması teknik sinyalle daha sıkı eşleştirilmeli.';
       } else {
-        sonuc = 'Bilanço tarafı core pozisyon için gerekli desteği sağlıyor. Giriş zamanlaması ve pozisyon büyüklüğü MAB-5 teknik sinyaline bırakılabilir; fundamental tarafta ek bir kısıt yok.';
+        sonuc = 'Bilanço tarafı core pozisyon için gerekli desteği sağlıyor. Giriş zamanlaması ve pozisyon büyüklüğü teknik sinyale bırakılabilir; fundamental tarafta ek bir kısıt yok.';
       }
     } else {
       sonuc = 'Yeterli metrik değerlendirilemediği için (toplam ' + totalEvaluated + ' metrik) net bir hüküm verilemiyor. Daha fazla veri girildiğinde değerlendirme güncellenecek.';
