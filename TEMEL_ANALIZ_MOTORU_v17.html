@@ -386,8 +386,6 @@ const initialData = {
   price:'', sharesOutstanding:'',
   hasInflationAdj:false, hasBioAssetGain:false, isReit:false, hasRelatedParty:false,
   navDiscount:'', isWellKnownHolding:false,
-  mab5Signal:'', maxPosition:'25', mab5Note:'',
-  pnlST:'', pnlStGun:'', pnlMACD:'', pnlMomentum:'', pnlBist:'', pnlObv:'', pnlUyari:'',
   // ── v15: ÇEYREKLİK SERİ DEPOSU ──
   // quarterlyStore: { "2026Q1": {revenue, netIncome, ...tüm ham kalemler}, "2025Q4": {...}, ... }
   quarterlyStore:{},
@@ -2123,32 +2121,6 @@ function FundamentalAnalysis() {
     }
   }
 
-  // MAB-5 entegrasyonu
-  const mab5 = (() => {
-    const sig = data.mab5Signal;
-    if (!sig) return null;
-    const maxPos = parseFloat(data.maxPosition) || 25;
-    const healthy = verdict && verdict.text === 'CORE';
-    const risky = verdict && verdict.text === 'BİLANÇO-BEKLE';
-    const stGun = data.pnlStGun === '' ? null : parseInt(data.pnlStGun, 10);
-    const timingWarn = [];
-    if (data.pnlUyari === 'uyari') timingWarn.push('Günlük UYARI aktif');
-    if (data.pnlObv === 'dagitim') timingWarn.push('OBV=DAĞITIM (hacim baskısı)');
-    if (stGun !== null && stGun <= 1) timingWarn.push('ST ' + stGun + ' gün (teyitsiz)');
-    const tw = timingWarn.length ? ' ⚠ ' + timingWarn.join(' + ') : '';
-    if (sig === 'cik') return {title:'ÇIKIŞ / pozisyon alma', detail:'ÇIK sinyali — yeni pozisyon yok; açık pozisyonda çıkış kuralını uygula.'};
-    if (sig === 'tut') return {title:'TUT — açık pozisyonu koru', detail:'TUT: stop/kâr-kilidi kurallarını uygula.' + tw};
-    if (sig === 'bekle') return {title:'POZİSYON AÇMA — BEKLE', detail:'Zamanlama yok; sinyal bekle.' + tw};
-    if (sig === 'aday') return {title:'ADAY — sadece izle', detail:'İzleme havuzunda, giriş yok.' + tw};
-    if (sig === 'radar') return {title:'RADAR — hazırlan, henüz girme', detail:'AL etiketine dönerse gir.' + tw};
-    if (sig === 'hazir') return {title:'HAZIR — bekle, bu AL değil', detail:(healthy ? 'Koşullar olgun ama etiket AL basmadı.' : 'Hazır ama temel karma — tetik yok + core yok = girme.') + tw};
-    // AL
-    const lo = Math.round(maxPos*0.4), hi = Math.round(maxPos*0.6);
-    if (healthy) return {title:'AL — tam pozisyon (~%' + maxPos + ')', detail:'AL + sağlam temel + tam pozisyon savunulabilir.' + tw};
-    if (risky) return {title:'AL var ama trade — core değil; küçük + sıkı stoplu', detail:'Temel zayıf. Yalnızca trade.' + tw};
-    return {title:'AL — azaltılmış pozisyon (~%' + lo + '–' + hi + ')', detail:'Karma temel. MAB-5 AL ama % küçük tut.' + tw};
-  })();
-
   const headlineLabel = verdict ? verdict.text : 'NET ETİKET YOK';
 
   // ── ÖZET KUTUSU: Güçlü/Zayıf yönler (ilk 30 saniyede ne görürdüm mantığı) ──
@@ -2418,12 +2390,6 @@ function FundamentalAnalysis() {
     body += pRow('Alacak Büyümesi vs Satış Büyümesi', r.receivableVsSalesGap, secEval('receivableVsSalesGap', r.receivableVsSalesGap, sectorKey), {pct:true, ratioId:'receivableVsSales'});
     body += pRow('Stok Büyümesi vs Satış Büyümesi', r.inventoryVsSalesGap, data.isReit ? 'na' : secEval('inventoryVsSalesGap', r.inventoryVsSalesGap, sectorKey), {pct:true, ratioId:'inventoryVsSales'});
 
-    if (mab5) {
-      body += pHeading('MAB-5 × Temel', 24);
-      body += pPlain(mab5.title, {bold:true, after:60});
-      body += pPlain(mab5.detail, {after:200});
-    }
-
     const narrative = buildVerdictNarrative();
     if (narrative) {
       body += pHeading('Değerlendirme Yorumu', 24);
@@ -2660,34 +2626,6 @@ function FundamentalAnalysis() {
       h('div', {style:{fontFamily:"'Fraunces',serif",fontSize:'22px',fontWeight:600,color:verdict.color}}, verdict.text),
       h('div', {style:{fontFamily:"'DM Sans',sans-serif",fontSize:'15px',color:'#e7e5e4',flex:1,minWidth:'200px'}}, verdict.detail),
       h('div', {style:{fontFamily:"'JetBrains Mono',monospace",fontSize:'14px',color:'#a8a29e'}}, negativeCount + '/' + totalEvaluated + ' olumsuz · %' + (negativeRatio*100).toFixed(0))
-    ),
-
-    // MAB-5 Paneli
-    h('div', {style:{background:'rgba(20,18,16,0.6)',border:'1px solid rgba(59,110,165,0.35)',borderLeft:'5px solid #3b6ea5',borderRadius:'2px',padding:'8px 14px',marginBottom:'7px'}},
-      h('div', {style:{display:'flex',gap:'12px',flexWrap:'wrap',alignItems:'flex-end',marginBottom:'7px'}},
-        h('div', null, lbl('MAB-5 Sinyali'), sel('mab5Signal',[['','— yok —'],['al','AL — GİR'],['radar','RADAR'],['hazir','HAZIR'],['aday','ADAY'],['tut','TUT'],['cik','ÇIK'],['bekle','BEKLE']], '150px')),
-        h('div', null, lbl('Maks Pozisyon %'), inp('maxPosition','25','number','70px')),
-        h('div', {style:{flex:1,minWidth:'160px'}}, lbl('Trend / Momentum Notu'), h('input',{type:'text',value:data.mab5Note||'',onChange:e=>handleChange('mab5Note',e.target.value),placeholder:'örn. ST sağlam, OBV pozitif',style:{width:'100%',background:'rgba(10,9,8,0.6)',border:'1px solid rgba(212,165,116,0.2)',borderRadius:'2px',padding:'3px 8px',color:'#f5f5f4',fontFamily:"'DM Sans',sans-serif",fontSize:'14px'}}))
-      ),
-      h('div', {style:{borderTop:'1px solid rgba(59,110,165,0.25)',paddingTop:'10px'}},
-        h('div', {style:{fontSize:'14px',color:'#7dd3fc',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:700,marginBottom:'7px'}}, 'Panel Aynası'),
-        h('div', {style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))',gap:'6px'}},
-          h('div', null, lbl('ST SÜREKLİ (gün)'), h('input',{type:'number',min:'0',value:data.pnlStGun||'',onChange:e=>handleChange('pnlStGun',e.target.value),placeholder:'1',style:{width:'100%',background:'rgba(10,9,8,0.6)',border:'1px solid rgba(212,165,116,0.2)',borderRadius:'2px',padding:'3px 6px',color:'#f5f5f4',fontSize:'14px'}})),
-          ...[
-            ['pnlST','ST',[['','—'],['up','UP'],['down','DOWN']]],
-            ['pnlMACD','MACD',[['','—'],['poz','POZ'],['neg','NEG']]],
-            ['pnlMomentum','Momentum',[['','—'],['asiri_alim','AŞIRI ALIM (≥70)'],['guclu','GÜÇLÜ (55-70)'],['notr','NÖTR (45-55)'],['zayif','ZAYIF (<45)']]],
-            ['pnlBist','XU100 D',[['','—'],['up','TREND UP'],['down','TREND DN']]],
-            ['pnlObv','OBV-EMA',[['','—'],['birim','BİRİKİM'],['dagitim','DAĞITIM']]],
-            ['pnlUyari','Günlük Uyarı',[['','—'],['temiz','TEMİZ'],['uyari','UYARI']]],
-          ].map(([k,l,opts]) => h('div', {key:k}, lbl(l), sel(k, opts)))
-        )
-      ),
-      mab5 && h('div', {style:{marginTop:'10px',paddingTop:'10px',borderTop:'1px solid rgba(59,110,165,0.25)'}},
-        h('div', {style:{fontSize:'14px',color:'#7dd3fc',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:700}}, 'MAB-5 × Temel'),
-        h('div', {style:{fontFamily:"'Fraunces',serif",fontSize:'16px',fontWeight:600,color:'#f5f5f4',marginTop:'2px'}}, mab5.title),
-        h('div', {style:{fontSize:'14px',color:'#cbd5e1',marginTop:'2px'}}, mab5.detail + (data.mab5Note ? ' · ' + data.mab5Note : ''))
-      )
     ),
 
     // ANA GRID — 3 sütun
