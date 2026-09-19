@@ -280,6 +280,54 @@ const SECTOR_PROFILES = {
 
 const SECTOR_OPTIONS = ['sanayi','teknoloji','tuketim','perakende','enerji','saglik','havayolu','tasimaci','insaat','telekom','gyo','holding','yatirim','banka'];
 
+// ── HİSSE KODU → SEKTÖR EŞLEMESİ (Mali'nin isteği: Fintables yüklenince sektör otomatik gelsin) ──
+// BİLİNÇLİ SINIRLAMA: bu, gerçek zamanlı bir BIST/KAP sektör veritabanı DEĞİL — sadece yaygın
+// bilinen BIST şirketleri için elle hazırlanmış, EN İYİ ÇABA (best-effort) bir tablo. Kapsam
+// dışı bir kod (ya da burada olsa bile Mali'nin kendi sınıflandırması farklıysa) sektör
+// alanını boş bırakır / mevcut seçimi hiç EZMEZ — "Sektör" açılır kutusu her zaman elle
+// düzeltilebilir kalır. Yanlış/eksik bir eşleme fark edilirse burada güncellenmeli, oran
+// eşiklerinin kendisine (SECTOR_PROFILES) DOKUNULMAZ.
+const TICKER_SECTOR_MAP = {
+  // Bankacılık
+  AKBNK:'banka', GARAN:'banka', ISCTR:'banka', YKBNK:'banka', VAKBN:'banka', HALKB:'banka',
+  SKBNK:'banka', TSKB:'banka', ICBCT:'banka', ALBRK:'banka', QNBFB:'banka',
+  // Teknoloji / Bilişim
+  LOGO:'teknoloji', KAREL:'teknoloji', NETAS:'teknoloji', INDES:'teknoloji', DESPC:'teknoloji',
+  ARENA:'teknoloji', ALCTL:'teknoloji', LINK:'teknoloji',
+  // Temel Tüketim / Gıda
+  CCOLA:'tuketim', AEFES:'tuketim', ULKER:'tuketim', PINSU:'tuketim', PNSUT:'tuketim',
+  TATGD:'tuketim', KENT:'tuketim', MERKO:'tuketim', BANVT:'tuketim', KRSTL:'tuketim', TUKAS:'tuketim',
+  // Perakende
+  BIMAS:'perakende', MGROS:'perakende', SOKM:'perakende', MAVI:'perakende', BIZIM:'perakende', VAKKO:'perakende',
+  // Enerji
+  TUPRS:'enerji', PETKM:'enerji', AYGAZ:'enerji', GWIND:'enerji', AKSEN:'enerji', ODAS:'enerji',
+  ZOREN:'enerji', ENJSA:'enerji', AKFYE:'enerji',
+  // Sağlık / İlaç
+  DEVA:'saglik', MPARK:'saglik', LKMNH:'saglik', ECILC:'saglik',
+  // Havayolu
+  THYAO:'havayolu', PGSUS:'havayolu', TAVHL:'havayolu',
+  // Taşımacılık / Lojistik
+  CLEBI:'tasimaci', RYSAS:'tasimaci',
+  // İnşaat
+  ENKAI:'insaat', TKFEN:'insaat',
+  // Telekom
+  TTKOM:'telekom', TCELL:'telekom',
+  // GYO
+  EKGYO:'gyo', ISGYO:'gyo', HLGYO:'gyo', TRGYO:'gyo', SNGYO:'gyo', AKFGY:'gyo', VKGYO:'gyo',
+  RYGYO:'gyo', YGGYO:'gyo', KLGYO:'gyo', PEGYO:'gyo', KRGYO:'gyo',
+  // Holding
+  KCHOL:'holding', SAHOL:'holding', DOHOL:'holding', AGHOL:'holding', ALARK:'holding', GLYHO:'holding',
+  ECZYT:'holding', GSDHO:'holding', GOZDE:'holding', POLHO:'holding', YAZIC:'holding', NTHOL:'holding',
+  // Yatırım Ortaklığı
+  ISMEN:'yatirim', ISYAT:'yatirim',
+  // Sanayi / Üretim (varsayılan geniş kategori — otomotiv, demir-çelik, kimya, dayanıklı tüketim vb.)
+  EREGL:'sanayi', KRDMD:'sanayi', KOZAL:'sanayi', KOZAA:'sanayi', TOASO:'sanayi', FROTO:'sanayi',
+  ARCLK:'sanayi', VESTL:'sanayi', SISE:'sanayi', ASTOR:'sanayi', TTRAK:'sanayi', OTKAR:'sanayi',
+  KORDS:'sanayi', BRISA:'sanayi', TMSN:'sanayi', CIMSA:'sanayi', AKCNS:'sanayi', SASA:'sanayi',
+  HEKTS:'sanayi', AKSA:'sanayi', BRSAN:'sanayi', GUBRF:'sanayi', ALKIM:'sanayi', DOAS:'sanayi',
+  KRONT:'sanayi', EGEEN:'sanayi', KARSN:'sanayi',
+};
+
 const secEval = (id, value, sector) => {
   const prof = SECTOR_PROFILES[sector] || SECTOR_PROFILES.sanayi;
   if (prof.disabled && prof.disabled.indexOf(id) !== -1) return 'na';
@@ -1911,6 +1959,7 @@ function FundamentalAnalysis() {
       }
 
       let blockedBy = null;
+      let autoSector = null;
       setData(d => {
         const hasExisting = d.ticker && Object.keys(d.quarterlyStore || {}).length > 0;
         if (hasExisting && d.ticker !== chosen) { blockedBy = d.ticker; return d; }
@@ -1918,7 +1967,9 @@ function FundamentalAnalysis() {
         const annualStore = {...d.annualStore};
         Object.entries(result.quarterlyRecords).forEach(([label, rec]) => { quarterlyStore[label] = {...(quarterlyStore[label]||{}), ...rec}; });
         Object.entries(result.annualRecords).forEach(([label, rec]) => { annualStore[label] = {...(annualStore[label]||{}), ...rec}; });
-        const merged = {...d, quarterlyStore, annualStore, ticker: d.ticker || chosen, dataMode:'quarterly'};
+        if (!d.sector && TICKER_SECTOR_MAP[chosen]) autoSector = TICKER_SECTOR_MAP[chosen];
+        const merged = {...d, quarterlyStore, annualStore, ticker: d.ticker || chosen,
+          sector: d.sector || TICKER_SECTOR_MAP[chosen] || d.sector, dataMode:'quarterly'};
         const periods = Object.keys(quarterlyStore).sort((a,b) => periodSortKey(b)-periodSortKey(a));
         return applyPeriodToData(merged, periods[0] || d.activePeriod, 'quarterly');
       });
@@ -1927,6 +1978,7 @@ function FundamentalAnalysis() {
         setUploadMsg('⚠️ Şu an ' + blockedBy + ' yüklü — farklı şirket (' + chosen + ') yüklemek için önce "Sıfırla" ya bas.');
       } else {
         let msg = '✅ Fintables yüklendi: ' + chosen + '.';
+        if (autoSector) msg += ' Sektör otomatik "' + (SECTOR_PROFILES[autoSector]||{}).label + '" olarak dolduruldu (yanlışsa açılır kutudan değiştirebilirsin).';
         if (extraSkipped.length) msg += ' Aynı yüklemede bulunan diğer şirketler atlandı (tek seferde tek şirket): ' + extraSkipped.join(', ') + '.';
         setUploadMsg(msg);
       }
