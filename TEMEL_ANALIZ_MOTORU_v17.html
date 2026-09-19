@@ -2473,10 +2473,11 @@ function FundamentalAnalysis() {
         ),
         h('input', {type:'file', accept:'.xlsx,.xls', multiple:true, onChange:handleFintablesUpload, style:{display:'none'}, id:'excel-inp-ft'}),
         h('button', {onClick:()=>document.getElementById('excel-inp-ft').click(), style:{background:'rgba(163,230,53,0.15)',border:'1px solid rgba(163,230,53,0.5)',color:'#a3e635',padding:'4px 12px',fontSize:'15px',fontWeight:600,letterSpacing:'0.05em',cursor:'pointer',textTransform:'uppercase',borderRadius:'2px'}}, 'Fintables Yükle'),
-        h('input', {type:'file', accept:'.xlsx,.xls', multiple:true, onChange:e=>handleExcelUpload(e,'quarterly'), style:{display:'none'}, id:'excel-inp-q'}),
-        h('input', {type:'file', accept:'.xlsx,.xls', multiple:true, onChange:e=>handleExcelUpload(e,'annual'), style:{display:'none'}, id:'excel-inp-a'}),
-        h('button', {onClick:()=>document.getElementById('excel-inp-q').click(), style:{background:'rgba(125,211,252,0.15)',border:'1px solid rgba(125,211,252,0.5)',color:'#7dd3fc',padding:'4px 12px',fontSize:'13px',fontWeight:600,letterSpacing:'0.05em',cursor:'pointer',textTransform:'uppercase',borderRadius:'2px',opacity:0.55}}, 'Çeyreklik Yükle (Investing — eski)'),
-        h('button', {onClick:()=>document.getElementById('excel-inp-a').click(), style:{background:'rgba(212,165,116,0.15)',border:'1px solid rgba(212,165,116,0.5)',color:'#d4a574',padding:'4px 12px',fontSize:'13px',fontWeight:600,letterSpacing:'0.05em',cursor:'pointer',textTransform:'uppercase',borderRadius:'2px',opacity:0.55}}, 'Yıllık Yükle (Investing — eski)'),
+        // Investing.com içe aktarma butonları (Çeyreklik/Yıllık Yükle — eski) Mali'nin isteğiyle
+        // arayüzden GİZLENDİ (18.09.2026'dan sonraki talep) — Fintables tek kaynak oldu.
+        // Fonksiyonlar (handleExcelUpload/parseInvestingSheet/INVESTING_MAP) BİLEREK silinmedi:
+        // daha önce bu akışla yüklenmiş quarterlyStore/annualStore kayıtları hâlâ okunabilsin
+        // diye. Geri getirmek gerekirse bu yorumun altındaki 4 satırı eski haline getir.
         h('button', {onClick:()=>{const t=(data.ticker||'rapor').toUpperCase();const prev=document.title;document.title=t+' — '+headlineLabel;window.print();setTimeout(()=>{document.title=prev;},800);}, style:{background:'#d4a574',border:'1px solid #d4a574',color:'#0a0908',padding:'4px 12px',fontSize:'15px',fontWeight:600,letterSpacing:'0.05em',cursor:'pointer',textTransform:'uppercase',borderRadius:'2px'}}, 'PDF'),
         h('button', {onClick:downloadWordReport, style:{background:'rgba(125,211,252,0.15)',border:'1px solid rgba(125,211,252,0.5)',color:'#7dd3fc',padding:'4px 12px',fontSize:'15px',fontWeight:600,letterSpacing:'0.05em',cursor:'pointer',textTransform:'uppercase',borderRadius:'2px'}}, 'Word'),
         h('button', {onClick:reset, style:{background:'transparent',border:'1px solid rgba(212,165,116,0.3)',color:'#d4a574',padding:'4px 12px',fontSize:'15px',letterSpacing:'0.05em',cursor:'pointer',textTransform:'uppercase',borderRadius:'2px'}}, 'Sıfırla')
