@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BIST Temel Analiz Konsolu v17 — Fintables + Çeyreklik + Yıllık + Sade Tablo</title>
+<title>BIST Temel Analiz Konsolu v18 — Fintables + Çeyreklik + Yıllık + Sade Tablo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1863,6 +1863,121 @@ function DuPontSozluk({ r }){
   );
 }
 
+// ── v18: BİLANÇO BAŞLIKLARI SÖZLÜĞÜ — Fintables/KAP tablolarındaki BAŞLIKLARIN dili ──
+// Mali'nin isteği: mevcut Sözlük oranları (ROE, FCF...) anlatıyor ama bilançoyu açınca karşına
+// çıkan başlıkların (Şerefiye, Azınlık Payları, Yeniden Sınıflandırılacak...) ne demek olduğunu
+// anlatmıyordu. Her kayıt: g=grup, t=başlık, gun=gündelik dilde, isim=neden bu ismi taşıyor,
+// dikkat=okurken dikkat, ornek=Anadolu Efes 2026/6 (milyon TL; sadece örnek, motora yüklenen
+// şirketten BAĞIMSIZ sabit metindir). Mevcut GLOSSARY'ye DOKUNULMADI; bu ayrı bir ek katmandır.
+const BILANCO_SOZLUGU = [
+  // ── Genel Okuma ──
+  {g:"Genel Okuma", t:"Dönen / Duran ve Kısa / Uzun Vadeli", gun:"Bilanço bir anın fotoğrafıdır. Her kalem 12 aylık çizgiye göre ikiye ayrılır: Dönen varlık ve kısa vadeli borç, 12 ay içinde nakde dönecek ya da ödenecek olanlardır. Duran varlık ve uzun vadeli borç, daha uzun sürede kapanır.", isim:"Dönen: sürekli devir halinde, nakde ‘dönen’ varlık. Duran: şirketin içinde ‘duran’, satılmak için değil kullanılmak için tutulan varlık.", dikkat:"Dönen varlıklar kısa vadeli borcu karşılıyor mu? Cari Oran bu soruya cevap verir.", ornek:"Dönen varlıklar 149.314, kısa vadeli borçlar 144.976 mn TL."},
+  {g:"Genel Okuma", t:"(-) işareti", gun:"‘Bu kalem toplamdan düşülür’ demektir. Sadece bir yön işaretidir, kötü bir şey söylemez.", isim:"Muhasebe dilinde parantez ya da eksi, çıkarılacak kalemi gösterir.", dikkat:"Bazı kaynaklarda gider eksi, bazılarında artı yazılır. Emin olmak için toplam satırının nasıl çıktığına bak.", ornek:"Satışların Maliyeti (-): −95.844 mn TL, satış gelirinden düşülür."},
+  {g:"Genel Okuma", t:"Dönemsel tablo = kümülatif", gun:"‘Dönemsel’ gelir tablosu ve nakit akışı yılbaşından beri toplamdır. 2026/6 sütunu ilk 6 ayı gösterir, sadece Nisan–Haziran'ı değil. Bilanço ise her zaman o günün fotoğrafıdır.", isim:"Dönem = yılbaşından o döneme kadar geçen süre.", dikkat:"Tek çeyreği görmek için Çeyreklik sekmesine bak ya da iki dönemin farkını al. Enflasyon muhasebesinde dönemler farklı alım gücüyle yazıldığı için fark yaklaşık çıkar.", ornek:"Satış Gelirleri 2026/3'te 66.803, 2026/6'da 154.294 mn TL: ikincisi 6 aylık toplamdır."},
+  {g:"Genel Okuma", t:"TMS 29 (Enflasyon Muhasebesi)", gun:"Yüksek enflasyonda tablolar dönem sonunda o günün alım gücüne çevrilir. Parasal olmayan kalemler (fabrika, stok, özkaynak) endeksle büyütülür; parasal kalemlere (nakit, alacak, borç) dokunulmaz, çünkü zaten güncel liradır.", isim:"TMS: Türkiye Muhasebe Standardı. 29 numaralı standart yüksek enflasyonlu ekonomileri düzenler.", dikkat:"Farklı dönem sütunları aynı ölçekte olmayabilir. Kıyas için geçen yılın aynı dönemini tercih et. Kâr, enflasyon kalemleriyle şişmiş ya da çarpılmış olabilir (bkz. Net Parasal Pozisyon Kazançları).", ornek:null},
+
+  // ── Varlıklar ──
+  {g:"Varlıklar", t:"Nakit ve Nakit Benzerleri", gun:"Kasadaki ve bankadaki para, ayrıca çok kısa sürede paraya dönen, değer kaybı riski düşük yatırımlar (kısa vadeli mevduat gibi).", isim:"‘Benzerleri’: neredeyse nakit gibi kullanılabilen kalemler.", dikkat:"Yüksek nakit tek başına iyi haber değildir; karşısında yüksek borç varsa net durum farklıdır. Net borç = finansal borç − nakit.", ornek:"Nakit 40.182 mn TL; finansal borç (kısa + uzun) 106.168 mn TL."},
+  {g:"Varlıklar", t:"Ticari Alacaklar", gun:"Mal satmış ama parasını henüz tahsil etmediğin müşteri bakiyeleri. ‘Veresiye satış’ tutarı.", isim:"‘Ticari’: şirketin asıl işinden (satıştan) doğan. ‘Diğer Alacaklar’ ise asıl iş dışından doğar (personele avans, vergi dairesinden alacak gibi).", dikkat:"Satıştan hızlı büyüyen alacak tahsilat sorununu ya da mevsim etkisini gösterebilir. Aynı dönemi geçen yılla kıyasla ve tahsilat süresini (alacak / satış × gün) hesapla.", ornek:"2025/12'de 31.715, 2026/6'da 56.092 mn TL. Sebep mevsimsellik: yaz sezonu Haziran'da alacağı şişirir. Doğru kıyas 2025/6 (55.013)."},
+  {g:"Varlıklar", t:"Stoklar", gun:"Satılmayı bekleyen mal, üretimdeki yarı mamul, hammadde ve ambalaj.", isim:"Şirketin ‘stokta’ tuttuğu, henüz satışa dönüşmemiş mal.", dikkat:"Stok devir süresi uzuyorsa mal rafta bekliyor demektir. TMS 29'da stoklar da endekslenir.", ornek:"37.101 mn TL; yaklaşık 70 günlük satışa yetecek düzey."},
+  {g:"Varlıklar", t:"Peşin Ödenmiş Giderler", gun:"Gelecek aylarda yararlanacağın bir mal ya da hizmet için önceden ödediğin para: sigorta, kira, reklam, verilen sipariş avansı.", isim:"Peşin: önceden ödenmiş. Gider yazılması ileri tarihe bırakılmış.", dikkat:"Dönem geçtikçe gelir tablosuna gider olarak akar. Nakit zaten çıkmıştır.", ornek:"Kısa vadeli 10.369, uzun vadeli 6.127 mn TL."},
+  {g:"Varlıklar", t:"Maddi Duran Varlıklar", gun:"Dokunabildiğin, uzun süre kullanılan varlıklar: fabrika, bina, arazi, makine, araç.", isim:"‘Maddi’: fiziksel karşılığı var. ‘Duran’: satmak için değil, kullanmak için elde tutulan.", dikkat:"Her yıl amortismanla değeri azalır. Yatırım harcaması amortismandan büyükse şirket varlık tabanını büyütüyor, küçükse eskitiyor.", ornek:"105.178 mn TL. 6 aylık yatırım harcaması 10.130, amortisman 8.424 mn TL."},
+  {g:"Varlıklar", t:"Kullanım Hakkı Varlıkları", gun:"Kiraladığın bina, depo, araç gibi şeyleri kullanma hakkının bilançodaki değeri. Sahibi olmasan da uzun süreli kiralamayı ‘varlık’ gibi gösterir; karşılığındaki kira borcu da borç tarafına yazılır.", isim:"Sahiplik değil, ‘kullanım hakkı’. Kiralama standardı (TFRS 16) ile geldi.", dikkat:"Kira yükünü borç gibi düşün: bilançoda görünen finansal borca kira borcu da dahil olabilir.", ornek:"5.700 mn TL."},
+  {g:"Varlıklar", t:"Maddi Olmayan Duran Varlıklar", gun:"Dokunulamayan ama gelir getiren haklar: marka, lisans, bayilik ve şişeleme hakları, yazılım ve şerefiye.", isim:"‘Maddi olmayan’: fabrika ya da makine gibi fiziksel karşılığı yok, sadece bir hak ya da değer var.", dikkat:"Toplam varlığın büyük kısmı bu kalemdeyse defter değeri ‘yumuşaktır’: bu haklar gerçekten satılabilir mi, yoksa satın almalardan kalan muhasebe değeri mi? Ayrıntısı dipnotta.", ornek:"157.337 mn TL, toplam varlıkların yaklaşık %32'si; özkaynağın yaklaşık %62'si."},
+  {g:"Varlıklar", t:"Şerefiye", gun:"Bir şirketi satın alırken, elindeki varlıkların değerinin üstüne ödenen itibar bedeli. Bir yayınevini alırken sadece binasına ve depodaki kitaplara değil; adına, yazar ağına ve okur güvenine de para vermek gibi.", isim:"Şeref = itibar, saygınlık. İngilizcesi goodwill.", dikkat:"Amortize edilmez, yılda bir değer düşüklüğü testine girer. Satın alınan iş kötüleşirse tek seferde silinebilir ve kârı zarara çevirebilir. Fintables dosyasında ayrı bir satır değildir: ‘Maddi Olmayan Duran Varlıklar’ içindedir, tutarı dipnotta yazar.", ornek:"Şerefiyenin ne kadar olduğu bu tabloda yok; dipnotlarda ‘Şerefiye’ başlığında aranır."},
+  {g:"Varlıklar", t:"Finansal Yatırımlar", gun:"Şirketin kendi işi dışında elinde tuttuğu hisse, tahvil, fon gibi yatırımlar.", isim:"Kısa vadeli olanlar dönen varlıklarda, uzun vadeli olanlar duran varlıklarda durur.", dikkat:"İçinde ne olduğunu dipnottan öğren. Bir anda büyüyen ya da küçülen bu tür kalem, mutlaka bir olayın izidir.", ornek:"Duran finansal yatırımlar 2024/12'de 28 mn TL iken 2025/3'te 67.436 mn TL. Sebep dosyada yok; dipnotta aranacak bir soru."},
+  {g:"Varlıklar", t:"Ertelenmiş Vergi Varlığı / Yükümlülüğü", gun:"Muhasebe kârı ile vergi kârı aynı yılda aynı olmaz. Aradaki zaman farkı, ileride ödenecek (yükümlülük) ya da ileride indirilecek (varlık) vergi olarak bilançoya yazılır. Bugün cepten çıkmayan ama gelecekte çıkacak ya da girecek vergi.", isim:"Ertelenmiş: vergisel etkisi ileri tarihe kalmış.", dikkat:"Nakit değil, muhasebe zamanlamasıdır. Sanayi şirketlerinde yükümlülük çoğunlukla duran varlıklardaki muhasebe-vergi farkından doğar.", ornek:"Varlık 12.182, yükümlülük 31.583 mn TL."},
+
+  // ── Borçlar ──
+  {g:"Borçlar", t:"Finansal Borçlar", gun:"Bankalardan alınan krediler ve ihraç edilen tahviller: faiz işleyen borçlar.", isim:"‘Finansal’: para temin etmek için alınmış borç. ‘Ticari Borç’ ise tedarikçiye mal alımından doğar ve genellikle faizsizdir.", dikkat:"Kısa vadeli kısım bir yıl içinde ödenecek olandır. Net Borç/FAVÖK bu kalemle ölçülür.", ornek:"Kısa vadeli 43.756, uzun vadeli 62.412 mn TL."},
+  {g:"Borçlar", t:"Ticari Borçlar", gun:"Tedarikçiden mal alıp henüz ödemediğin tutar. Tedarikçi seni faizsiz finanse ediyor.", isim:"‘Ticari’: alım-satım işinden doğan.", dikkat:"Ödeme süresi (ticari borç / satışın maliyeti × gün) uzunsa güçlü pazarlık gücü olabilir; ama ödeme zamanı gelince nakit çıkışı yaratır.", ornek:"63.005 mn TL; yaklaşık 119 günlük maliyete denk."},
+  {g:"Borçlar", t:"Karşılıklar", gun:"Kesin tutarı ya da zamanı belli olmayan ama gerçekleşmesi muhtemel yükümlülükler için önceden ayrılan pay: dava, kıdem tazminatı, garanti gideri.", isim:"Gelecekteki bir gider için ‘karşılığı ayrılan’ para.", dikkat:"Gelir tablosunda gider yazılır ama nakit henüz çıkmaz. Karşılık gerçekleşince ödeme yapılır.", ornek:"Kısa vadeli 2.554, uzun vadeli 1.986 mn TL."},
+  {g:"Borçlar", t:"Ertelenmiş Gelirler", gun:"Parası tahsil edilmiş ama mal ya da hizmeti henüz verilmemiş satış. Konser biletinin parasını almışsın, konser ileride.", isim:"Ertelenmiş: geliri ileri tarihte yazılacak.", dikkat:"Borç gibi görünür ama nakitle değil, mal ya da hizmetle kapanır.", ornek:"Kısa vadeli 791 mn TL."},
+  {g:"Borçlar", t:"Türev Araçlar", gun:"Kur, faiz ya da emtia fiyatındaki değişime karşı yapılan sözleşmeler (swap, vadeli işlem). Sigortaya ya da bahse benzer; değeri her dönem güncellenir.", isim:"Değeri başka bir şeyden ‘türeyen’ araç.", dikkat:"Varlık tarafında olan şirketin lehine, borç tarafında olan aleyhine değer taşır. Riskten korunma amaçlıysa riski azaltır, spekülatifse artırır.", ornek:"Kısa vadeli yükümlülüklerde 806 mn TL."},
+  {g:"Borçlar", t:"Hedge Dahil Net Yabancı Para Pozisyonu", gun:"Yabancı para cinsinden varlıklar eksi yabancı para borçlar, riskten korunma işlemleri düşüldükten sonra. Eksiyse şirket kurun yükselmesinden zarar eder.", isim:"Hedge: riskten korunma.", dikkat:"Eksi büyükse kur şokuna açıktır. TL değer kaybettiğinde finansal gider ve kur farkı büyür.", ornek:"−19.317 mn TL."},
+
+  // ── Özkaynak ──
+  {g:"Özkaynak", t:"Ödenmiş Sermaye", gun:"Ortakların şirkete koyduğu, ticaret siciline yazılı sermaye. Hisse nominali 1 TL ise bu rakam aynı zamanda hisse adedini verir.", isim:"‘Ödenmiş’: taahhüt edilenin fiilen ödenen kısmı.", dikkat:"Değişimi bedelli (para girer) mi, bedelsiz (iç kaynaktan) mi diye ayır.", ornek:"592 mn TL → 5.921 mn TL (2025/3 → 2025/6): bedelsiz sermaye artırımı."},
+  {g:"Özkaynak", t:"Sermaye Düzeltme Farkları", gun:"Enflasyon nedeniyle ödenmiş sermayenin güncel alım gücüne çevrilmesinden doğan fark. Nakit değil, muhasebe kaydıdır. Bedelsiz artırımda bu kutudan sermayeye taşınabilir.", isim:"Sermayenin enflasyona göre ‘düzeltilmesinden’ çıkan fark.", dikkat:"Ödenmiş sermaye artarken bu kalem aynı tutarda azalıyorsa olay bedelsizdir.", ornek:"18.647 → 13.318 mn TL. Azalış (yaklaşık 5.329) ödenmiş sermayedeki artışa eşit."},
+  {g:"Özkaynak", t:"Bedelsiz Sermaye Artırımı", gun:"Şirketin iç kaynaklarını (birikmiş kâr, sermaye düzeltme farkı) sermayeye çevirip hissedara bedava hisse dağıtması. Pastanın boyutu değişmez, daha çok dilime kesilir.", isim:"Bedelsiz: hissedardan para alınmaz. Bedelli: alınır ve şirkete nakit girer.", dikkat:"Toplam özkaynak değişmez. Hisse fiyatı orana göre bölünür, hissedarın toplam serveti aynı kalır. Grafikte düzeltilmiş (ADJ) veri kullan, yoksa sahte düşüş görürsün.", ornek:"26.06.2025'te %900 oranında bedelsiz: 1 hisse 10 hisse oldu."},
+  {g:"Özkaynak", t:"Paylara İlişkin Primler (İskontolar)", gun:"Hisse ihraç edilirken nominal değerin üzerinde toplanan fark. Nominali 1 TL olan hisse halka arzda 5 TL'ye satılırsa aradaki 4 TL prim olur.", isim:"Nominal değerin üstündeki ‘prim’; altındaysa iskonto.", dikkat:"Eski sermaye artırımlarının izidir, güncel performansı anlatmaz.", ornek:"3.206 mn TL."},
+  {g:"Özkaynak", t:"Kardan Ayrılan Kısıtlanmış Yedekler", gun:"Kanunun ya da esas sözleşmenin zorunlu tuttuğu, kârdan ayrılıp dağıtılamayan tutar (yasal yedek akçe).", isim:"Kârdan ‘ayrılan’ ve kullanımı ‘kısıtlanan’ yedek.", dikkat:"Özkaynak içindedir ama temettü olarak çekilemez.", ornek:"8.796 mn TL."},
+  {g:"Özkaynak", t:"Geçmiş Yıllar Kar/Zararları", gun:"Şirketin yıllar içinde kazanıp ortaklara dağıtmayıp içeride bıraktığı birikmiş kâr (eksiyse birikmiş zarar). Hesapta biriken tasarruf gibi.", isim:"Halk dilinde ‘dağıtılmamış kâr’. İngilizcesi retained earnings.", dikkat:"Büyük olması güçlü geçmişi gösterir ama nakit olarak durduğu anlamına gelmez. Çoğu şirkette fabrikaya, stoğa ya da alacağa dönüşmüştür.", ornek:"157.034 mn TL, özkaynağın en büyük kutularından biri."},
+  {g:"Özkaynak", t:"Kâr veya Zararda Yeniden Sınıflandırılacak Birikmiş Diğer Kapsamlı Gelirler (Giderler)", gun:"Özkaynağı değiştiren ama kâr tablosuna girmeyen kazanç ve kayıplar. Taslak defteri gibi düşün: kâr tablosu yayımlanmış metin, bu kalem henüz yayımlanmamış notlardır. ‘Yeniden sınıflandırılacak’, bu notların ileride (örneğin yabancı bir iştirak satılınca) kâr tablosuna geçebileceği demektir.", isim:"‘Kapsamlı gelir’: kâra ek olarak doğrudan özkaynağa giden kazanç ve kayıpların toplamı. Genellikle yabancı para çevrim farklarını ve riskten korunma sonuçlarını içerir.", dikkat:"Eksi büyüyorsa genellikle yabancı operasyonların TL'ye çevrilen değeri eriyor demektir; kesin sebep dipnottan doğrulanır. Defter değerini (PD/DD) doğrudan aşağı çeker.", ornek:"−69.428 mn TL; 2025/12'de −61.949 idi."},
+  {g:"Özkaynak", t:"Kâr veya Zararda Yeniden Sınıflandırılmayacak Birikmiş Diğer Kapsamlı Gelirler (Giderler)", gun:"Aynı türden ‘not defteri’ kalemi, ama bunlar hiçbir zaman kâr tablosuna geçmez. Örneğin çalışanlara ödenecek tazminat yükümlülüğünün yeniden ölçümü.", isim:"‘Yeniden sınıflandırılmayacak’: kâr tablosuna hiçbir zaman aktarılmayacak.", dikkat:"Genellikle küçük ve ikinci derecede önemlidir. Büyük değişim görürsen dipnota bak.", ornek:"−493 mn TL."},
+  {g:"Özkaynak", t:"Azınlık Payları / Ana Ortaklık Payları", gun:"Şirket başka şirketleri kontrol ediyorsa (yönetimi elinde tutuyorsa) onların tamamını tablosuna alır. Ama o şirketlerin bir kısmı başka ortaklara aittir. O ortakların payı ‘azınlık payı’, şirketin kendi hissedarlarına kalan kısım ‘ana ortaklık payı’dır.", isim:"Resmî adı ‘kontrol gücü olmayan paylar’. ‘Azınlık’ ismi yanıltıcı olabilir: pay yaklaşık yarı yarıya da olabilir.", dikkat:"Hisse başına hesaplarda (F/K, PD/DD, hisse başı kâr) toplam değil ana ortaklık payı kullanılır. Toplam kâr aynı kalırken azınlığa giden pay artarsa senin payın küçülür.", ornek:"Özkaynakta ana ortaklık 125.630, azınlık 126.789 mn TL. 6 aylık kârın 7.275'i ana ortaklığa, 6.793'ü azınlığa."},
+
+  // ── Gelir Tablosu ──
+  {g:"Gelir Tablosu", t:"Satışların Maliyeti (-)", gun:"Sattığın malı üretmek ya da satın almak için harcanan doğrudan maliyet: hammadde, işçilik, fabrika gideri.", isim:"Sadece satılan malın maliyeti; satılmayan stok bilançoda kalır.", dikkat:"Satış − bu kalem = Brüt Kâr. Brüt marj düşüyorsa maliyet baskısı ya da fiyat sorunu var demektir.", ornek:"6 ay: satış 154.294, maliyet −95.844, brüt kâr 58.450 mn TL (yaklaşık %38)."},
+  {g:"Gelir Tablosu", t:"Pazarlama, Satış ve Dağıtım / Genel Yönetim Giderleri", gun:"Üretim dışı işletme giderleri: reklam, dağıtım ağı, satış kadrosu, yönetim ve ofis harcamaları.", isim:"Faaliyet giderleri: işi yürütmenin maliyeti.", dikkat:"Marka ve dağıtım gücüyle yaşayan şirketlerde pazarlama ve dağıtım büyük bir kalemdir.", ornek:"6 ay: pazarlama −29.014, genel yönetim −11.783 mn TL."},
+  {g:"Gelir Tablosu", t:"Faaliyet Karı (Zararı)", gun:"Şirketin asıl işinden, finansman ve vergiden önce kazandığı kâr: brüt kâr eksi işletme giderleri, artı eksi diğer faaliyet gelir ve giderleri.", isim:"‘Faaliyet’: şirketin esas işi.", dikkat:"Borçlanma yapısından bağımsız olduğu için ‘iş iyi mi?’ sorusuna en yakın kalemdir.", ornek:"6 ay: 17.463 mn TL (satışın yaklaşık %11'i)."},
+  {g:"Gelir Tablosu", t:"Finansal Gelirler / Finansal Giderler (-)", gun:"Asıl iş dışındaki finansman kalemleri: faiz gideri, faiz geliri, kur farkı kâr ve zararı.", isim:"‘Esas faaliyet dışı’: şirketin asıl işi olmayan ama borç ve para yönetiminden doğan.", dikkat:"Borçlu şirketlerde faaliyet karının önemli kısmı burada erir. Net Parasal Pozisyon Kazancıyla birlikte oku.", ornek:"6 ay: gelir 3.063, gider −12.470 mn TL."},
+  {g:"Gelir Tablosu", t:"Net Parasal Pozisyon Kazançları (Kayıpları)", gun:"Enflasyon muhasebesinin ürettiği kalem. Parasal olmayan kalemler endekslenirken, parasal kalemlerin (nakit, alacak, borç) reel değeri enflasyonla değişir. Net borçlu şirketin borcu enflasyonla reel olarak erir; bu erime kazanç olarak yazılır. Nakit girişi değildir ama ekonomik karşılığı vardır.", isim:"Parasal pozisyon: parasal varlıklar eksi parasal yükümlülükler.", dikkat:"Tek başına ‘kâğıt üstü kâr’ gibi durur, ama faizle birlikte okumak gerekir: faiz oranları enflasyon payını içerdiği için finansal gider de yüksektir. Üçünü (finansal gelir, finansal gider, parasal kazanç) toplayıp net finansmana bak.", ornek:"6 ay: +12.096 mn TL. Finansal gelir ve giderle birlikte net finansman +2.689 mn TL."},
+  {g:"Gelir Tablosu", t:"Dönem Vergi Geliri (Gideri) / Ertelenmiş Vergi Geliri (Gideri)", gun:"Dönem vergisi, bu dönem kâr üzerinden ödenecek gerçek vergidir. Ertelenmiş vergi ise muhasebe ile vergi arasındaki zaman farkından doğan kayıttır, nakit değildir.", isim:"Ertelenmiş: vergisel etkisi ileri tarihe kalan.", dikkat:"Nakit vergi yükü için dönem vergisine bak. Nakit akışında ‘Vergi ödemeleri’ satırı gerçek çıkışı gösterir.", ornek:"6 ay: dönem vergisi −5.998, ertelenmiş +44 mn TL."},
+
+  // ── Nakit Akışı ──
+  {g:"Nakit Akışı", t:"İşletme Faaliyetlerinden Nakit Akışları", gun:"Şirketin asıl işinden gerçekte yarattığı nakit: kâr, nakit-dışı giderler ve işletme sermayesi değişimi düzeltildikten sonra kalan.", isim:"‘İşletme’: şirketin günlük işi.", dikkat:"Kârla nakdin farkı burada görünür. Bu formatta ödenen faiz işletme bölümünde değil, finansman bölümündedir; bu yüzden işletme nakdi faizden önceki güçtür.", ornek:"6 ay: 12.143 mn TL; dönem kârı 14.068 mn TL."},
+  {g:"Nakit Akışı", t:"Yatırım Faaliyetlerinden Nakit Akışları", gun:"Fabrika, makine, iştirak alımı gibi geleceğe yatırım için çıkan (nadiren giren) nakit.", isim:"‘Yatırım’: bugünkü parayı yarının getirisi için bağlamak.", dikkat:"Eksi olması normaldir. Önemli olan yatırımın amortismana göre büyüklüğü ve getirisidir.", ornek:"6 ay: −9.698 mn TL; duran varlık alımı −10.130."},
+  {g:"Nakit Akışı", t:"Finansman Faaliyetlerinden Nakit Akışları", gun:"Şirket ile borç verenler ve ortaklar arasındaki nakit hareketi: borç alma ve ödeme, faiz, temettü.", isim:"‘Finansman’: işi yürütmek için dışarıdan para sağlama ve geri ödeme.", dikkat:"Borçlanma girişi işletme ve yatırım açığını kapatıyorsa, şirket kârını ya da temettüsünü borçla finanse ediyor olabilir.", ornek:"6 ay: net borçlanma +7.476, ödenen net faiz −6.990, temettü −3.127 mn TL; toplam −3.787."}
+];
+
+const BILANCO_GRUPLARI = ['Tümü', 'Genel Okuma', 'Varlıklar', 'Borçlar', 'Özkaynak', 'Gelir Tablosu', 'Nakit Akışı'];
+
+// ── Bilanço Başlıkları sekmesi (Eğitim Modu'nun 6. alt bölümü) ──
+function BilancoBasliklari(){
+  const C = EGT_C;
+  const [search, setSearch] = useState('');
+  const [grup, setGrup] = useState('Tümü');
+  const tr = s => String(s || '').toLocaleLowerCase('tr-TR');
+  const q = tr(search.trim());
+  const filtered = BILANCO_SOZLUGU.filter(e =>
+    (grup === 'Tümü' || e.g === grup) &&
+    (!q || tr(e.t + ' ' + e.gun + ' ' + (e.isim || '') + ' ' + (e.dikkat || '') + ' ' + (e.ornek || '')).indexOf(q) !== -1)
+  );
+  const line = (label, text, color) => text && h('div', {style:{fontSize:'12px',color:C.t2,lineHeight:1.6,marginTop:'6px'}},
+    h('strong', {style:{color: color || C.gold}}, label + ' '), text);
+
+  return h('div', {style:{marginTop:'16px'}},
+    h('div', {style:{background:'rgba(212,165,116,0.07)',border:'1px solid rgba(212,165,116,0.3)',borderRadius:'2px',padding:'14px 16px',marginBottom:'14px'}},
+      h('div', {style:{fontFamily:"'Fraunces',serif",fontWeight:600,fontSize:'18px',color:C.t1,marginBottom:'6px'}}, 'Tablo Sözlüğü — Bilanço, Gelir Tablosu, Nakit Akışı'),
+      h('div', {style:{fontSize:'13px',color:C.t1,lineHeight:1.6,marginBottom:'8px'}},
+        'Finansal tablolar da bir metindir. Başlıkları hukuk dilinden gelir, ama mantıkları basittir. Bir kalemde takılırsan üç soruyu sor:'),
+      h('div', {style:{fontSize:'13px',color:C.t2,lineHeight:1.7}},
+        h('div', null, '1. Bu, şirketin sahip olduğu bir şey mi? (varlık)'),
+        h('div', null, '2. Kimin parasıyla alınmış? Borç mu, ortakların parası mı? (kaynak)'),
+        h('div', null, '3. Bu dönem ne olmuş? Büyümüş mü, küçülmüş mü, nereye gitmiş?')
+      ),
+      h('div', {style:{fontSize:'11px',color:C.t3,lineHeight:1.5,marginTop:'8px'}},
+        'Örnek rakamlar Anadolu Efes 2026/6 dönemindendir (milyon TL). Yüklediğin şirketten bağımsız, sabit örneklerdir; kendi şirketinde aynı kalemi ara ve karşılaştır.')
+    ),
+    h('div', {style:{background:'rgba(20,18,16,0.4)',border:'1px solid '+C.hair,borderRadius:'2px',padding:'14px 16px'}},
+      h('input', {type:'text', value:search, onChange:e=>setSearch(e.target.value), placeholder:'Bir başlık ara... (ör. "şerefiye", "azınlık", "parasal")',
+        style:{width:'100%',background:'rgba(10,9,8,0.6)',border:'1px solid '+C.hair,borderRadius:'2px',
+          padding:'8px 12px',color:C.t1,fontFamily:"'DM Sans',sans-serif",fontSize:'13px',marginBottom:'10px'}}),
+      h('div', {style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}},
+        BILANCO_GRUPLARI.map(k => h('button', {key:k, onClick:()=>setGrup(k), style:{
+          background: grup===k ? C.gold : 'transparent', color: grup===k ? '#0a0908' : C.t2,
+          border:'1px solid '+(grup===k ? C.gold : C.hair), padding:'4px 12px',
+          fontFamily:"'DM Sans',sans-serif", fontSize:'12px', fontWeight: grup===k ? 600 : 400,
+          borderRadius:'2px', cursor:'pointer'}}, k))
+      ),
+      h('div', {style:{fontSize:'11px',color:C.t3,marginBottom:'8px'}}, filtered.length + ' başlık'),
+      h('div', {style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:'8px',maxHeight:'640px',overflowY:'auto'}},
+        filtered.length === 0
+          ? h('div', {style:{gridColumn:'1/-1',textAlign:'center',color:C.t3,fontSize:'13px',padding:'20px'}}, '"' + search + '" için sonuç bulunamadı.')
+          : filtered.map(e => h('div', {key:e.g + '|' + e.t, style:{background:'rgba(10,9,8,0.4)',border:'1px solid '+C.hair,borderRadius:'2px',padding:'12px 14px'}},
+              h('div', {style:{fontSize:'13px',fontWeight:600,color:C.gold,marginBottom:'6px'}}, e.t),
+              h('div', {style:{fontSize:'13px',color:C.t1,lineHeight:1.6}}, e.gun),
+              line('Neden bu isim:', e.isim),
+              line('Okurken dikkat:', e.dikkat),
+              e.ornek && h('div', {style:{fontSize:'12px',color:C.t2,lineHeight:1.55,marginTop:'8px',padding:'6px 10px',borderLeft:'2px solid '+C.blue,background:'rgba(125,211,252,0.05)'}},
+                h('strong', {style:{color:C.blue}}, 'Örnek (Anadolu Efes 2026/6): '), e.ornek)
+            ))
+      )
+    )
+  );
+}
+
 // ── Rehberli Tur — LiveModel'i sarmalayıp adım adım yönlendirir; gerçek hesaplama LiveModel'de kalır ──
 function RehberliTur({ data }){
   const C = EGT_C;
@@ -2017,14 +2132,169 @@ function VakaKarsilastirma(){
   );
 }
 
-// ── Eğitim Modu — üst sarmalayıcı: 5 alt bölüm arasında geçiş ──
+// ── Tabloyu Oku — Eğitim Modu'nun YENİ ilk durağı. Mali'nin isteği: "bir bilançoyu, gelir
+// tablosunu ve nakit akış tablosunu manuel olarak okuyabileceğim, içerikleri anlaşılır
+// anlatan, ilişkileri aydınlatan tam bir eğitim modülü". Canlı 3-Tablo Modeli (LiveModel)
+// bunu zaten YAPIYOR ama kaldıraç/slider gerektiriyor VE en az 2 dönem veri istiyor — bu
+// bileşen SADECE OKUMAK isteyenler için, tek dönemle bile çalışır (Sade Tablo'nun veri
+// kaynağıyla AYNI: data.revenue/totalAssets/... tek dönem alanları), sliderı YOK, sadece
+// yüklenmiş GERÇEK şirketin gerçek rakamlarını satır satır açıklayarak gösterir ve altına
+// üç tablonun birbirine nasıl bağlandığını GERÇEK sayılarla anlatan bir "İlişkiler" bloğu
+// ekler. İkinci bir hesaplama YAZILMADI — Sade Tablo'daki AYNI türetme mantığı (num/fmt ile).
+function TabloyuOku({ data, r }){
+  const C = EGT_C;
+  if (!data.revenue && !data.totalAssets) {
+    return h('div', {style:{marginTop:'16px',padding:'16px',textAlign:'center',color:C.t2,fontSize:'13px',border:'1px dashed '+C.hair,borderRadius:'2px'}},
+      'Tabloyu okuyabilmek için önce veri gerekiyor. Üstteki "Fintables Yükle" ile Excel yükle ya da "📊 Temel Analiz" sekmesinden elle veri gir.');
+  }
+
+  const rev = num(data.revenue), gp = num(data.grossProfit), op = num(data.operatingProfit),
+        eb = num(data.ebitda), ni = num(data.netIncome), ie = num(data.interestExpense);
+  const smm = (rev!==null && gp!==null) ? rev-gp : null;
+  const opex = (gp!==null && eb!==null) ? gp-eb : null;
+  const amort = (eb!==null && op!==null) ? eb-op : null;
+  const ieAbs = ie!==null ? Math.abs(ie) : null;
+  const vok = (op!==null && ieAbs!==null) ? op-ieAbs : null;
+  const vergiDiger = (vok!==null && ni!==null) ? vok-ni : null;
+
+  const totA = num(data.totalAssets), curA = num(data.currentAssets), cashV = num(data.cash),
+        recv = num(data.receivables), inv = num(data.inventory);
+  const otherCur = (curA!==null && cashV!==null && recv!==null && inv!==null) ? curA-cashV-recv-inv : null;
+  const nonCurA = (totA!==null && curA!==null) ? totA-curA : null;
+
+  const totL = num(data.totalLiabilities), curL = num(data.currentLiabilities), eq = num(data.equity);
+  const nonCurL = (totL!==null && curL!==null) ? totL-curL : null;
+  const totKaynak = (totL!==null && eq!==null) ? totL+eq : null;
+  const balanceGap = (totKaynak!==null && totA!==null) ? totKaynak-totA : null;
+  const balanceOk = balanceGap!==null && totA!==null && totA!==0 && Math.abs(balanceGap/totA) <= 0.005;
+
+  const ocf = num(data.operatingCashFlow), cap = num(data.capex);
+  const capAbs = cap!==null ? Math.abs(cap) : null;
+  const fcfPeriod = (ocf!==null && capAbs!==null) ? ocf-capAbs : null;
+
+  // Önceki dönem varsa (YoY otomatik doldurulmuşsa) gerçek Δ'larla "İlişkiler" bölümünü somutlaştır.
+  const prevRecv = num(data.prevReceivables), prevInv = num(data.prevInventory), prevEq = num(data.prevEquity);
+  const dRecv = (recv!==null && prevRecv!==null) ? recv-prevRecv : null;
+  const dInv = (inv!==null && prevInv!==null) ? inv-prevInv : null;
+  const dEquity = (eq!==null && prevEq!==null) ? eq-prevEq : null;
+
+  const Row = ({label, val, s, explain, final}) => {
+    const isTotal = s === '=';
+    return h('div', {style:{padding: isTotal?'8px 4px':'6px 4px', borderTop: isTotal?'1px solid rgba(212,165,116,0.3)':'none',
+      borderBottom: isTotal?'1px solid rgba(212,165,116,0.3)':'1px solid rgba(212,165,116,0.06)',
+      background: final?'rgba(212,165,116,0.08)':'transparent'}},
+      h('div', {style:{display:'grid',gridTemplateColumns:'18px 1fr auto',gap:'8px',alignItems:'baseline'}},
+        h('span', {style:{display:'inline-block',width:'18px',textAlign:'center',fontFamily:"'JetBrains Mono',monospace",fontSize:'14px',fontWeight:700,
+          color: s==='=' ? C.gold : s==='−' ? C.red : s==='+' ? C.green : 'transparent'}}, s || '·'),
+        h('span', {style:{fontSize: isTotal?'15px':'14px', color:C.t1, fontWeight: isTotal?600:400}}, label),
+        h('span', {style:{fontFamily:"'JetBrains Mono',monospace",fontSize: isTotal?'16px':'15px',color: val===null?C.t3:C.t1,fontWeight: isTotal?700:500}}, val===null?'—':fmt(val,{decimals:0}))
+      ),
+      explain && h('div', {style:{fontSize:'12px',color:C.t2,lineHeight:1.5,marginTop:'3px',paddingLeft:'26px',fontStyle:'italic'}}, explain)
+    );
+  };
+
+  const iliski = (color, text) => h('div', {style:{display:'flex',gap:'8px',padding:'8px 10px',marginBottom:'6px',
+    background:'rgba(10,9,8,0.4)',borderLeft:'3px solid '+color,borderRadius:'0 2px 2px 0'}},
+    h('div', {style:{fontSize:'13px',color:C.t1,lineHeight:1.6}}, text));
+
+  return h('div', {style:{marginTop:'16px'}},
+    h('div', {style:{background:'rgba(212,165,116,0.07)',border:'1px solid rgba(212,165,116,0.3)',borderRadius:'2px',padding:'14px 16px',marginBottom:'14px'}},
+      h('div', {style:{fontFamily:"'Fraunces',serif",fontWeight:600,fontSize:'18px',color:C.t1,marginBottom:'6px'}},
+        (data.ticker ? data.ticker + ' — ' : '') + 'Tabloyu Oku'),
+      h('div', {style:{fontSize:'13px',color:C.t1,lineHeight:1.6}},
+        'Aşağıda yüklediğin şirketin GERÇEK rakamları, üç tabloda, satır satır. Her satırın altındaki italik cümle o satırın ne anlama geldiğini açıklar. En altta üç tablonun birbirine nasıl bağlandığını, senin gerçek sayılarınla gösteren bir "İlişkiler" bölümü var. Burada hiçbir şeyi değiştiremezsin — sadece okursun; oynayarak öğrenmek istersen "3-Tablo Modeli" sekmesine geç.')
+    ),
+
+    h('div', {style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:'10px',marginBottom:'14px'}},
+      h(S, {title:'1) Gelir Tablosu — dönem boyunca ne kazandın', accent:'#a3e635'},
+        h(Row, {label:'Hasılat', val:rev, s:'', explain:'Sattığın mal/hizmetten elde ettiğin toplam gelir. Zincirin başlangıcı — aşağıdaki her satır bunun bir parçasını başka bir yere taşır.'}),
+        h(Row, {label:'Satılan Malın Maliyeti', val:smm, s:'−', explain:'Sattığın malı üretmenin/tedarik etmenin doğrudan maliyeti (hammadde, işçilik). Hasılattan çıkınca Brüt Kâr kalır.'}),
+        h(Row, {label:'Brüt Kâr', val:gp, s:'=', explain:'Ürününün/hizmetinin fiyatlama gücü — genel giderlerden ÖNCEKİ kâr.'}),
+        h(Row, {label:'Faaliyet Giderleri', val:opex, s:'−', explain:'Kira, maaş, pazarlama gibi işi yürütmenin genel giderleri — üretimle değil, işletmeyi ayakta tutmakla ilgili.'}),
+        h(Row, {label:'FAVÖK', val:eb, s:'=', explain:'Faiz, vergi, amortisman ÖNCESİ kâr — nakit üretme gücünün en yalın hâli, şirketler arası kıyas için kullanılır.'}),
+        h(Row, {label:'Amortisman & İtfa', val:amort, s:'−', explain:'NAKİT ÇIKIŞI DEĞİL — geçmişte alınan bir duran varlığın maliyetinin yıllara yayılmış payı. Aşağıda Nakit Akışı\'nda bu satır GERİ EKLENECEK.'}),
+        h(Row, {label:'Faaliyet Kârı', val:op, s:'=', explain:'Şirketin asıl işinden, borç yapısından bağımsız kazancı — "iş iyi mi?" sorusuna en yakın cevap.'}),
+        h(Row, {label:'Faiz Gideri', val:ieAbs, s:'−', explain:'Borcun bedeli. Burada düşülüyor çünkü borçlanma kararı esas işten ayrı bir karar.'}),
+        h(Row, {label:'Vergi Öncesi Kâr', val:vok, s:'='}),
+        h(Row, {label:'Vergi & Diğer', val:vergiDiger, s:'−'}),
+        h(Row, {label:'Net Kâr', val:ni, s:'=', final:true, explain:'Zincirin sonu. Buradan İKİ yöne gider: aşağıda Nakit Akışı\'nın İLK satırı olur; Bilanço\'da Özkaynak tarafına eklenir (temettü düşülerek).'})
+      ),
+
+      h(S, {title:'2) Bilanço — Varlıklar (elindekiler)', accent:'#7dd3fc'},
+        h(Row, {label:'Nakit ve Benzerleri', val:cashV, s:'', explain:'Kasadaki/bankadaki para. Aşağıdaki Nakit Akışı tablosunun mantıksal SONUCU bu satırla eşleşir — ikisi aynı parayı iki açıdan gösterir.'}),
+        h(Row, {label:'Alacaklar', val:recv, s:'+', explain:'Satmış ama henüz tahsil edememiş olduğun tutar. İki dönem arasındaki DEĞİŞİMİ, Nakit Akışı\'nın "işletme sermayesi" kısmını besler (bkz. İlişkiler).'}),
+        h(Row, {label:'Envanter (Stoklar)', val:inv, s:'+', explain:'Satılmayı bekleyen mal. Aynı şekilde değişimi nakit akışını etkiler.'}),
+        h(Row, {label:'Diğer Dönen Varlıklar', val:otherCur, s:'+'}),
+        h(Row, {label:'Dönen Varlıklar', val:curA, s:'=', explain:'1 yıl içinde nakde dönecek varlıkların toplamı.'}),
+        h(Row, {label:'Duran Varlıklar', val:nonCurA, s:'+', explain:'Fabrika, makine gibi uzun vadeli varlıklar. Değeri her yıl amortismanla azalır — yukarıdaki Gelir Tablosu\'ndaki Amortisman satırıyla bağlantılı.'}),
+        h(Row, {label:'Toplam Varlıklar', val:totA, s:'=', final:true, explain:'Şirketin sahip olduğu HER ŞEY. Aşağıdaki Toplam Kaynaklar\'a MUTLAKA eşit olmalı — bilançonun temel kuralı, "denge".'})
+      ),
+
+      h(S, {title:'3) Bilanço — Kaynaklar (kimin parası)', accent:'#7dd3fc'},
+        h(Row, {label:'Cari Borçlar', val:curL, s:'', explain:'1 yıl içinde ödenecek borçlar.'}),
+        h(Row, {label:'Uzun Vadeli Yükümlülükler', val:nonCurL, s:'+'}),
+        h(Row, {label:'Toplam Yükümlülükler', val:totL, s:'=', explain:'Şirketin BAŞKASININ parasıyla finanse edilen kısmı.'}),
+        h(Row, {label:'Toplam Özkaynak', val:eq, s:'+', explain:'Ortakların koyduğu para + şirketin şimdiye kadar biriktirip dağıtmadığı kâr. Her dönem yukarıdaki Net Kâr kadar büyür (temettü düşülerek).'}),
+        h(Row, {label:'Toplam Kaynaklar', val:totKaynak, s:'=', final:true, explain:'Toplam Varlıklar\'la birebir eşleşmeli — bir varlığın parası ya borçtan ya ortaktan gelir, üçüncü bir yol yok.'}),
+        balanceGap!==null && h('div', {style:{marginTop:'8px',fontSize:'12px',color: balanceOk ? C.green : '#fbbf24',fontStyle:'italic'}},
+          balanceOk ? '✓ Denge tutuyor — Toplam Kaynaklar ile Toplam Varlıklar örtüşüyor.'
+            : '⚠ Toplam Kaynaklar, Toplam Varlıklar ile tam örtüşmüyor (fark: ' + fmt(balanceGap,{decimals:0}) + '). Kalemlerden biri eksik/hatalı girilmiş olabilir.')
+      ),
+
+      h(S, {title:'4) Nakit Akışı — gerçek para hareketi', accent:'#fbbf24'},
+        h(Row, {label:'Faaliyetlerden Sağlanan Nakit', val:ocf, s:'', explain:'Net Kâr\'dan (yukarıdaki Gelir Tablosu\'nun sonu) başlanıp amortisman geri eklenerek ve alacak/stok/borç değişimi düzeltilerek bulunan GERÇEK nakit üretimi.'}),
+        h(Row, {label:'Yatırım Harcaması (Capex)', val:capAbs, s:'−', explain:'Yeni fabrika/makine almak için çıkan nakit — Bilanço\'daki Duran Varlıklar\'ı büyütür.'}),
+        h(Row, {label:'Serbest Nakit Akışı', val:fcfPeriod, s:'=', final:true, explain:'Şirketin gerçekten cebe koyduğu, temettü/borç ödeme/geri alım için kullanılabilecek nakit.'})
+      )
+    ),
+
+    h('div', {style:{background:'rgba(20,18,16,0.4)',border:'1px solid '+C.hair,borderRadius:'2px',padding:'14px 16px'}},
+      h('div', {style:{fontFamily:"'Fraunces',serif",fontWeight:600,fontSize:'17px',color:C.t1,marginBottom:'10px'}}, 'İlişkiler — üç tablo aslında TEK bir hikâye anlatıyor'),
+
+      ni!==null && iliski(C.green,
+        h('span', null, h('strong',null,'Net Kâr köprüsü: '),
+          'Gelir Tablosu\'nun son satırı Net Kâr = ' + fmt(ni,{decimals:0}) + '. Bu sayı YUKARIDA görmediğin iki yere daha gider: (1) Nakit Akışı tablosunun İLK satırı olarak yeniden başlar, (2) Bilanço\'da Toplam Özkaynak\'ı büyütür (temettü varsa o kadar eksiğiyle).'
+          + (dEquity!==null ? ' Nitekim bu dönemde özkaynak ' + fmt(dEquity,{decimals:0}) + ' değişti' + (Math.abs(dEquity-ni) < Math.abs(ni)*0.3 ? ' — Net Kâr\'a yakın, beklendiği gibi.' : ' — Net Kâr\'dan belirgin farklı, muhtemelen temettü dağıtıldı ya da başka bir özkaynak hareketi (sermaye artırımı, enflasyon düzeltmesi vb.) oldu.') : ''))
+      ),
+
+      amort!==null && iliski('#fbbf24',
+        h('span', null, h('strong',null,'Amortisman — aynı sayı, zıt iş: '),
+          'Amortisman (' + fmt(amort,{decimals:0}) + ') Gelir Tablosu\'nda kârı AZALTAN bir gider, ama Nakit Akışı\'nda GERİ EKLENEN bir kalem — çünkü bu nakit bu dönem değil, duran varlık SATIN ALINDIĞI dönem çıkmıştı. Aynı sayı iki tabloda zıt yönde iki farklı iş görüyor.')
+      ),
+
+      (dRecv!==null || dInv!==null) && iliski(C.blue,
+        h('span', null, h('strong',null,'İşletme sermayesi — kâr ile nakit neden ayrışır: '),
+          (dRecv!==null ? 'Alacaklar bu dönem ' + fmt(dRecv,{decimals:0}) + ' değişti' + (dRecv>0 ? ' (arttı — o kadar tahsilat henüz kasaya girmedi, nakit kârın gerisinde kaldı).' : dRecv<0 ? ' (azaldı — geçmiş satışların tahsilatı bu dönem nakde döndü, nakit kârı geride bıraktı).' : '.') : '')
+          + (dInv!==null ? ' Stoklar ' + fmt(dInv,{decimals:0}) + ' değişti' + (dInv>0 ? ' (arttı — o kadar para mala bağlandı).' : dInv<0 ? ' (azaldı — depodaki mal nakde döndü).' : '.') : '')
+          + ' Bu değişimler tam olarak yukarıdaki "Faaliyetlerden Sağlanan Nakit" ile Gelir Tablosu\'ndaki Net Kâr arasındaki farkı açıklar.')
+      ),
+
+      cashV!==null && iliski(C.blue,
+        h('span', null, h('strong',null,'Nakit köprüsü: '),
+          'Nakit Akışı tablosunun mantıksal sonucu (faaliyet + yatırım + finansman nakdi, dönem başı nakde eklenince) Bilanço\'daki Nakit ve Benzerleri satırıyla (' + fmt(cashV,{decimals:0}) + ') aynı şeydir — iki tablo aynı gerçek parayı iki farklı açıdan gösteriyor.')
+      ),
+
+      totA!==null && totKaynak!==null && iliski(C.gold,
+        h('span', null, h('strong',null,'Denge: '),
+          'Toplam Varlıklar (' + fmt(totA,{decimals:0}) + ') = Toplam Kaynaklar (' + fmt(totKaynak,{decimals:0}) + '). Bu eşitlik ASLA bozulmaz — Bilanço\'nun iki tarafı da aynı şirketi, iki farklı soruyla (neyin var / kimin parası) anlatır.')
+      ),
+
+      h('div', {style:{fontSize:'12px',color:C.t3,marginTop:'10px',fontStyle:'italic'}},
+        'Bu ilişkileri kendi elinle değiştirip canlı görmek istersen → "3-Tablo Modeli" sekmesi. Bir başlığın (ör. "Şerefiye", "Azınlık Payları") ne anlama geldiğini merak edersen → "Tablo Sözlüğü" sekmesi.')
+    )
+  );
+}
+
+// ── Eğitim Modu — üst sarmalayıcı: 7 alt bölüm arasında geçiş (v18: + Tabloyu Oku, + Tablo Sözlüğü) ──
 function EgitimModu({ data, r }){
   const C = EGT_C;
-  const [sub, setSub] = useState('tablo');
+  const [sub, setSub] = useState('oku');
   const seed = useMemo(() => lmBuildSeed(data), [data]);
   const tabs = [
+    ['oku', 'Tabloyu Oku'],
     ['tablo', '3-Tablo Modeli'],
     ['dupont', 'DuPont & Sözlük'],
+    ['basliklar', 'Tablo Sözlüğü'],
     ['tur', 'Rehberli Tur'],
     ['quiz', 'Quiz'],
     ['vaka', 'Vaka & Karşılaştırma'],
@@ -2039,8 +2309,10 @@ function EgitimModu({ data, r }){
         borderRadius:'2px', cursor:'pointer'
       }}, l))
     ),
+    sub === 'oku' && h(TabloyuOku, { data, r }),
     sub === 'tablo' && h(LiveModel, { data }),
     sub === 'dupont' && h(DuPontSozluk, { r }),
+    sub === 'basliklar' && h(BilancoBasliklari, {}),
     sub === 'tur' && (seed.ok
       ? h(RehberliTur, { data })
       : h('div', {style:{marginTop:'16px',padding:'16px',textAlign:'center',color:C.t2,fontSize:'13px',border:'1px dashed '+C.hair,borderRadius:'2px'}},
@@ -2730,7 +3002,7 @@ function FundamentalAnalysis() {
       body += pPlain('Olası sonuç: ' + narrative.sonuc, {after:200});
     }
 
-    body += pPlain('BIST Temel Analiz Konsolu v17 · Yatırım tavsiyesi değildir', {after:0});
+    body += pPlain('BIST Temel Analiz Konsolu v18 · Yatırım tavsiyesi değildir', {after:0});
 
     const docxBytes = buildDocxBytes(body);
     const blob = new Blob([docxBytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
@@ -2792,7 +3064,7 @@ function FundamentalAnalysis() {
     // HEADER
     h('div', {style:{borderBottom:'1px solid rgba(212,165,116,0.2)',paddingBottom:'8px',marginBottom:'7px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'8px'}},
       h('h1', {style:{fontFamily:"'Fraunces',serif",fontSize:'22px',fontWeight:500,letterSpacing:'-0.02em',margin:0,color:'#f5f5f4'}},
-        'BIST Temel Analiz ', h('em', {style:{color:'#d4a574',fontStyle:'italic'}}, 'Konsolu'), h('span', {style:{fontSize:'15px',color:'#78716c',marginLeft:'8px',fontFamily:"'JetBrains Mono',monospace",fontStyle:'normal'}}, 'v17')
+        'BIST Temel Analiz ', h('em', {style:{color:'#d4a574',fontStyle:'italic'}}, 'Konsolu'), h('span', {style:{fontSize:'15px',color:'#78716c',marginLeft:'8px',fontFamily:"'JetBrains Mono',monospace",fontStyle:'normal'}}, 'v18')
       ),
       h('div', {style:{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}},
         // Renk sayaçları
